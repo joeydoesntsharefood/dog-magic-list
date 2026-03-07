@@ -14,7 +14,8 @@ const priceService = new PriceService();
 const scraper = new LigaMagicScraper();
 const importService = new ImportService(priceService);
 
-const dbPath = path.join(process.cwd(), 'magic-list.db');
+const userDataPath = process.env.USER_DATA_PATH || process.cwd();
+const dbPath = path.join(userDataPath, 'magic-list.db');
 const db = new Database(dbPath);
 const listRepo = new ListRepository(db);
 const marketRepo = new MarketRepository(db);

@@ -25,10 +25,10 @@ export interface ScraperResult {
 
 export class LigaMagicScraper {
   private BASE_URL = 'https://www.ligamagic.com.br/';
-  private DEBUG_ROOT = path.join(process.cwd(), 'debug');
+  private DEBUG_ROOT = path.join(process.env.USER_DATA_PATH || process.cwd(), 'debug');
 
   constructor() {
-    if (!fs.existsSync(this.DEBUG_ROOT)) fs.mkdirSync(this.DEBUG_ROOT);
+    if (!fs.existsSync(this.DEBUG_ROOT)) fs.mkdirSync(this.DEBUG_ROOT, { recursive: true });
   }
 
   private createDebugFolder(cardName: string): string {
@@ -46,11 +46,11 @@ export class LigaMagicScraper {
 
   async getOffers(cardName: string, directUrl?: string): Promise<ScraperResult> {
     const debugPath = this.createDebugFolder(cardName);
-    const browser = await puppeteer.launch({ 
-      headless: false, 
+    const browser = await puppeteer.launch({
+      headless: false,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1366,1024']
     });
-    
+
     const page = await browser.newPage();
     await page.setViewport({ width: 1366, height: 1024 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
