@@ -1,0 +1,47 @@
+{
+  "paletas_de_cores_logotipo_doglife": {
+    "projeto": "Design de Software com Logo 'CACHORRO VELHO TATUADO'",
+    "estilo": "Tatuagem Vintage / Old School",
+    "fundo_papel_envelhecido_círculo": "#E8DCCA",
+    "paletas": {
+      "principais": {
+        "preto_linha_clássica": {
+          "hex": "#1C1C1C",
+          "uai": "Usado para todas as linhas de contorno, texto principal e áreas escuras sólidas (jaqueta)."
+        },
+        "creme_pergaminho_base": {
+          "hex": "#E8DCCA",
+          "uai": "A cor de fundo do círculo. Perfeita para fundos de UI secundários ou áreas de cartão."
+        }
+      },
+      "destaques_e_tatuagens": {
+        "vermelho_rosa_tatuagem": {
+          "hex": "#8A3A34",
+          "uai": "Um vermelho escuro e mudo usado nas rosas. Bom para botões de ação ou links principais."
+        },
+        "marrom_couro": {
+          "hex": "#6E5C49",
+          "uai": "O tom rico da jaqueta de couro e da coleira. Bom para divisores ou bordas sutis."
+        },
+        "bege_pele_cachorro": {
+          "hex": "#B9AA95",
+          "uai": "A cor da pele do bulldog. Um tom de pele médio e quente."
+        },
+        "bronze_envelhecido": {
+          "hex": "#9E8C6A",
+          "uai": "A cor da tag 'VELHO' e detalhes da fivela. Um tom metálico de latão/bronze."
+        },
+        "cinza_metálico": {
+          "hex": "#A0A0A0",
+          "uai": "Usado para as tachas metálicas. Bom para ícones ou textos de suporte."
+        }
+      },
+      "específico_interface": {
+        "tema_escuro_texto_principal": "#E8DCCA",
+        "tema_escuro_destaque": "#A0A0A0",
+        "tema_claro_texto_principal": "#1C1C1C",
+        "tema_claro_destaque": "#6E5C49"
+      }
+    }
+  }
+}
