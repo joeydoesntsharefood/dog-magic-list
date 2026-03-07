@@ -19,7 +19,7 @@ describe('US01.6: Frontend - Busca Avançada e Seleção', () => {
           versions: [{
             id: '1', name: 'Prefeito de Avabruck', rarity: 'rare', priceUSD: '10.00', priceBRL: '50.00',
             imageUrl: 'http://image.url', scryfallUri: 'http://scryfall.url', colorIdentity: ['G'],
-            legalities: { commander: 'legal' }, category: 'THREAT', setName: 'Innistrad'
+            legalities: { commander: 'legal' }, category: 'THREAT', setName: 'Innistrad', cmc: 2
           }]
         })
       } as Response);

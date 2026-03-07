@@ -19,7 +19,7 @@ describe('US01.5: Frontend - Consulta Rápida de Preços', () => {
           versions: [{
             id: '1', name: 'Black Lotus', rarity: 'rare', priceUSD: '10.00', priceBRL: '55.20',
             imageUrl: 'http://image.url', scryfallUri: 'http://scryfall.url', colorIdentity: [],
-            legalities: { commander: 'legal' }, category: 'THREAT', setName: 'Alpha'
+            legalities: { commander: 'legal' }, category: 'THREAT', setName: 'Alpha', cmc: 0
           }]
         })
       } as Response);

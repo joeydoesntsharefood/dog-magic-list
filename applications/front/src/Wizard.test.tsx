@@ -14,7 +14,7 @@ describe('US03.1: Frontend - Wizard de Construção de Decks', () => {
           name: 'Atraxa',
           versions: [{ 
             id: 'v1', name: 'Atraxa', colorIdentity: ['G','W','U','B'], legalities: { commander: 'legal' }, 
-            priceBRL: '100.00', imageUrl: 'http://atraxa.img', category: 'THREAT', setName: 'Commander 2016'
+            priceBRL: '100.00', imageUrl: 'http://atraxa.img', category: 'THREAT', setName: 'Commander 2016', cmc: 4
           }]
         })
       });
@@ -24,14 +24,14 @@ describe('US03.1: Frontend - Wizard de Construção de Decks', () => {
 
   it('deve iniciar o Wizard e apresentar as perguntas de perfil', async () => {
     render(<App />);
-    const wizardBtn = await screen.findByText(/\[\+ NEW_GRIMOIRE\]/i);
+    const wizardBtn = await screen.findByText(/\[\+ INITIATE_NEW_BUILD\]/i);
     fireEvent.click(wizardBtn);
     expect(screen.getByText(/SELECT_DECK_FORMAT/i)).toBeInTheDocument();
   });
 
   it('deve permitir configurar o budget e passar pelo fluxo de comandante', async () => {
     render(<App />);
-    fireEvent.click(await screen.findByText(/\[\+ NEW_GRIMOIRE\]/i));
+    fireEvent.click(await screen.findByText(/\[\+ INITIATE_NEW_BUILD\]/i));
     
     fireEvent.click(screen.getByText(/COMMANDER/i));
     fireEvent.click(screen.getByText(/COMPETITIVE/i));
@@ -57,5 +57,41 @@ describe('US03.1: Frontend - Wizard de Construção de Decks', () => {
     await waitFor(() => {
       expect(screen.getByText(/BUDGET_REMAINING: R\$ 1\.000,00/i)).toBeInTheDocument();
     });
+  });
+
+  it('deve permitir adicionar e remover uma carta no registro do deck', async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText(/\[\+ INITIATE_NEW_BUILD\]/i));
+    
+    // Pular para o passo de construção (Step 4)
+    fireEvent.click(screen.getByText(/STANDARD/i));
+    fireEvent.click(screen.getByText(/COMPETITIVE/i));
+    fireEvent.click(screen.getByText(/AGGRO/i));
+    fireEvent.change(screen.getByPlaceholderText(/SET_LIMIT_BRL.../i), { target: { value: '500' } });
+    fireEvent.click(screen.getByText(/\[INITIALIZE_CONSTRUCTION\]/i));
+
+    // Buscar e adicionar carta
+    const searchInput = screen.getByPlaceholderText(/ADD_CARD.../i);
+    fireEvent.change(searchInput, { target: { value: 'Atraxa' } });
+    fireEvent.keyDown(searchInput, { key: 'Enter', code: 'Enter' });
+
+    const suggestion = await screen.findByText(/Atraxa/i);
+    fireEvent.click(suggestion);
+
+    const commitBtn = await screen.findByText(/\[COMMIT_TO_DECK\]/i);
+    fireEvent.click(commitBtn);
+
+    // Verificar se apareceu no grid
+    expect(screen.getByText(/Atraxa/i)).toBeInTheDocument();
+    expect(screen.getByText(/1x/i)).toBeInTheDocument();
+
+    // Tentar remover (primeiro clique pede confirmação)
+    const removeBtn = screen.getByText(/\[X\]/i);
+    fireEvent.click(removeBtn);
+    expect(screen.getByText(/\[CONFIRM_REMOVE\?\]/i)).toBeInTheDocument();
+
+    // Confirmar remoção
+    fireEvent.click(screen.getByText(/\[CONFIRM_REMOVE\?\]/i));
+    expect(screen.queryByText(/Atraxa/i)).not.toBeInTheDocument();
   });
 });

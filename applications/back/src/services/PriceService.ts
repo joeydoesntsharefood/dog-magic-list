@@ -1,4 +1,4 @@
-import { CardClassifier, CardCategory } from './CardClassifier';
+import { CardClassifier } from './CardClassifier';
 
 export interface CardSearchResult {
   id: string;
@@ -20,9 +20,10 @@ export interface CardVersion {
   priceFoilBRL: string | null;
   imageUrl: string;
   scryfallUri: string;
-  category: CardCategory;
+  category: string;
+  cmc: number;
+  colorIdentity: string[];
   legalities: Record<string, string>;
-  colorIdentity: string[]; // NOVO: Identidade de Cor
 }
 
 export interface CardPriceResult {
@@ -39,12 +40,12 @@ export class PriceService {
     const response = await fetch(`${this.SCRYFALL_API_SEARCH}?q=${encodeURIComponent(query)}&unique=cards`);
     if (!response.ok) return [];
     const data = await response.json();
-    return data.data.slice(0, 10).map((card: any) => ({
-      id: card.id,
-      name: card.name,
-      mana_cost: card.mana_cost || '',
-      colors: card.colors || [],
-      type_line: card.type_line || ''
+    return (data.data || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      mana_cost: c.mana_cost,
+      colors: c.colors || [],
+      type_line: c.type_line
     }));
   }
 
@@ -91,13 +92,14 @@ export class PriceService {
         imageUrl: v.image_uris?.normal || v.card_faces?.[0]?.image_uris?.normal || '',
         scryfallUri: v.scryfall_uri,
         category,
+        cmc: v.cmc ?? 0,
         legalities: v.legalities,
-        colorIdentity: v.color_identity || [] // Injetando Identidade de Cor
+        colorIdentity: v.color_identity || []
       };
     });
 
     return {
-      name: versionsData[0].name,
+      name: cardName,
       versions
     };
   }
