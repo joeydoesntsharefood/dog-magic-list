@@ -56,6 +56,7 @@ interface CardVersion {
   priceUSD: string | null; priceFoilUSD: string | null;
   priceBRL: string | null; priceFoilBRL: string | null;
   imageUrl: string; scryfallUri: string; category: string;
+  cmc: number;
   legalities: Record<string, string>; colorIdentity: string[];
 }
 interface CardPriceResult { name: string; versions: CardVersion[]; }
@@ -64,6 +65,7 @@ interface LigaMagicOption { name: string; setName: string; link: string; }
 interface OffersResult { avgPrice: string | null; offers: LigaMagicOffer[]; options?: LigaMagicOption[]; updatedAt: string | null; fromCache?: boolean; }
 
 interface WizardDeckItem {
+  uid: string;
   allVersions: CardVersion[];
   selectedVersion: CardVersion;
   quantity: number;
@@ -105,6 +107,14 @@ function App() {
   const [searching, setSearching] = useState(false);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [viewingDeck, setViewingDeck] = useState<any | null>(null);
+  const [confirmingDeleteDeckId, setConfirmingDeleteDeckId] = useState<string | null>(null);
+  const [confirmingRemoveCardUid, setConfirmingRemoveCardUid] = useState<string | null>(null);
+
+  const showError = (msg: string, duration = 5000) => {
+    setErrorMessage(msg);
+    setTimeout(() => setErrorMessage(prev => prev === msg ? null : prev), duration);
+  };
 
   useEffect(() => {
     const logs = ['INIT: BOOT_CORE', 'SYSTEM: KERNEL_1.1', 'LOCAL: SQLITE_OK', 'NET: SCRY_HANDSHAKE', 'READY: MOUNT_UI'];
@@ -126,6 +136,18 @@ function App() {
     } catch (e) { console.error('DB_FAIL'); }
   };
 
+  const handleViewDeck = async (id: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/decks/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setViewingDeck(data);
+      }
+    } catch (e) {
+      showError('LOAD_FAIL: GRIMOIRE_NOT_ACCESSIBLE');
+    }
+  };
+
   const handleCreateList = async () => {
     if (!newListName.trim()) return;
     try {
@@ -135,7 +157,7 @@ function App() {
         body: JSON.stringify({ name: newListName.toUpperCase() }),
       });
       if (response.ok) { setNewListName(''); loadLists(); }
-    } catch (e) { console.error('CREATE_FAIL'); }
+    } catch (e) { console.error('CREATE_FAIL'); showError('CREATE_FAIL: RECORD_ALREADY_EXISTS_OR_LOCKED'); }
   };
 
   const resetWizard = () => {
@@ -200,16 +222,17 @@ function App() {
     const isBasicLand = selected.setName.toLowerCase().includes('basic land') || ['Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Ilha', 'Pântano', 'Montanha', 'Floresta', 'Planície'].includes(selected.name);
     const existing = wizardDeck.find(item => item.selectedVersion.name === selected.name);
     if (deckProfile.format === 'COMMANDER' && existing && !isBasicLand) {
-      setErrorMessage('ACTION_DENIED: SINGLETON_CONSTRAINT');
-      setTimeout(() => setErrorMessage(null), 3000);
+      showError('ACTION_DENIED: SINGLETON_CONSTRAINT', 3000);
       return;
     }
-    setWizardDeck(prev => [...prev, { allVersions: cardResult.versions, selectedVersion: selected, quantity: wizardQuantity }]);
+    const uid = Math.random().toString(36).substring(2, 11);
+    setWizardDeck(prev => [...prev, { uid, allVersions: cardResult.versions, selectedVersion: selected, quantity: wizardQuantity }]);
     setSearchResult(null); setSearchName(''); setWizardQuantity(1);
   };
 
-  const handleRemoveCardFromWizard = (index: number) => {
-    setWizardDeck(prev => prev.filter((_, i) => i !== index));
+  const handleRemoveCardFromWizard = (uid: string) => {
+    setWizardDeck(prev => prev.filter(item => item.uid !== uid));
+    setConfirmingRemoveCardUid(null);
   };
 
   const validateCardLegality = (card: CardVersion) => {
@@ -262,6 +285,7 @@ function App() {
       if (response.ok) {
         const imported: {data: CardPriceResult, quantity: number}[] = await response.json();
         setWizardDeck(imported.map(i => ({
+          uid: Math.random().toString(36).substring(2, 11),
           allVersions: i.data.versions,
           selectedVersion: i.data.versions[0],
           quantity: i.quantity
@@ -269,35 +293,120 @@ function App() {
         setWizardStep(deckProfile.format === 'COMMANDER' ? 3 : 4);
       }
     } catch (e) {
-      setErrorMessage('IMPORT_FAIL');
-      setTimeout(() => setErrorMessage(null), 3000);
+      showError('IMPORT_FAIL', 3000);
     } finally { setImporting(false); }
   };
 
-  const handleSaveDeck = async () => {
-    const deckName = prompt("NAME_THIS_GRIMOIRE_RECORD:");
-    if (!deckName) return;
+  const generateDeckName = () => {
+    if (wizardDeck.length === 0) return "NEW_GRIMOIRE_RECORD";
+    const mainCategory = wizardDeck.reduce((acc, item) => {
+      const cat = item.selectedVersion.category;
+      acc[cat] = (acc[cat] || 0) + item.quantity;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const topCat = Object.entries(mainCategory).sort((a,b) => b[1] - a[1])[0][0];
+    const topCard = wizardDeck.sort((a,b) => b.quantity - a.quantity)[0].selectedVersion.name;
+    const format = deckProfile.format || 'DECK';
+    
+    return `${topCard.split(',')[0]} ${topCat} ${format}`.toUpperCase();
+  };
+
+  const handleDeleteDeck = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (confirmingDeleteDeckId !== id) {
+      setConfirmingDeleteDeckId(id);
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/decks/${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        setConfirmingDeleteDeckId(null);
+        loadLists();
+      } else {
+        const contentType = response.headers.get("content-type");
+        let errorMsg = "UNKNOWN_ERROR";
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          const errJson = await response.json();
+          errorMsg = errJson.error;
+        } else {
+          errorMsg = await response.text();
+        }
+        console.error('DELETE_ERROR:', errorMsg);
+        showError(`DELETE_FAIL: ${errorMsg}`);
+        setConfirmingDeleteDeckId(null);
+      }
+    } catch (err: any) {
+      console.error('DELETE_FETCH_ERROR:', err);
+      showError(`DELETE_FAIL: ${err.message || 'NETWORK_ERROR'}`);
+      setConfirmingDeleteDeckId(null);
+    }
+  };
+
+  const handleUpdateAnalysis = async (deckId: string, analysis: any) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/decks/${deckId}/analysis`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analysis }),
+      });
+      if (response.ok) {
+        setViewingDeck((prev: any) => ({ ...prev, analysis_json: JSON.stringify(analysis) }));
+      }
+    } catch (e) {
+      showError('SAVE_FAIL: ANALYSIS_NOT_PERSISTED');
+    }
+  };
+
+  const handleSaveDeck = async (manualName?: string) => {
+    const finalName = manualName || prompt("NAME_THIS_GRIMOIRE_RECORD:", generateDeckName());
+    if (!finalName) return;
+
+    // Cálculo da análise para salvar junto se estiver no Step 6
+    let analysis = null;
+    if (wizardStep === 6) {
+      analysis = {
+        manaCurve: [0, 1, 2, 3, 4, 5, 6, 7].map(c => wizardDeck.filter(i => i.selectedVersion.category !== 'LAND' && (i.selectedVersion.cmc === c)).reduce((a,b)=>a+b.quantity, 0)),
+        pillars: {
+          LANDS: wizardDeck.filter(i => i.selectedVersion.category === 'LAND').reduce((a,b)=>a+b.quantity, 0),
+          RAMP: wizardDeck.filter(i => i.selectedVersion.category === 'RAMP').reduce((a,b)=>a+b.quantity, 0),
+          DRAW: wizardDeck.filter(i => i.selectedVersion.category === 'CARD_ADVANTAGE').reduce((a,b)=>a+b.quantity, 0),
+          INTERACTION: wizardDeck.filter(i => i.selectedVersion.category === 'INTERACTION').reduce((a,b)=>a+b.quantity, 0),
+        }
+      };
+    }
+
     const payload = {
-      name: deckName.toUpperCase(),
+      name: finalName.toUpperCase(),
       format: deckProfile.format,
       archetype: deckProfile.archetype,
       targetBudget: deckProfile.targetBudget,
+      analysis_json: analysis ? JSON.stringify(analysis) : null,
       cards: wizardDeck.map(item => ({
         card_id: item.selectedVersion.id,
         name: item.selectedVersion.name,
         quantity: item.quantity,
         price_brl: item.selectedVersion.priceBRL,
-        category: item.selectedVersion.category
+        category: item.selectedVersion.category,
+        cmc: item.selectedVersion.cmc
       }))
     };
+
     try {
       const response = await fetch(`${API_BASE_URL}/decks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (response.ok) { resetWizard(); setActiveTab('lists'); loadLists(); }
-    } catch (e) { setErrorMessage('SAVE_FAIL'); }
+      if (response.ok) {
+        resetWizard();
+        setActiveTab('lists');
+        loadLists();
+      }
+    } catch (e) {
+      showError('SAVE_FAIL: DB_TRANSACTION_ERROR');
+    }
   };
 
   const filteredDeck = useMemo(() => {
@@ -358,8 +467,15 @@ function App() {
       )}
 
       {errorMessage && (
-        <div className="fixed top-0 left-0 right-0 z-50 p-2 bg-[#8A3A34] text-white text-center text-xs font-bold border-b border-black">
-          [ALERT] {errorMessage}
+        <div 
+          onClick={() => setErrorMessage(null)}
+          className="fixed top-0 left-0 right-0 z-[110] p-4 bg-[#8A3A34] text-white text-center text-xs font-black border-b-2 border-black cursor-pointer animate-in slide-in-from-top duration-300 hover:bg-[#A54A42] shadow-2xl group"
+        >
+          <div className="flex items-center justify-center gap-4">
+            <span className="animate-pulse text-white/50">!!</span>
+            <span className="tracking-widest uppercase">[ALERT_PROTOCOL]: {errorMessage}</span>
+            <span className="text-[8px] opacity-0 group-hover:opacity-100 transition-opacity font-bold bg-black/20 px-2 py-1 rounded">CLICK_TO_TERMINATE</span>
+          </div>
         </div>
       )}
 
@@ -378,23 +494,143 @@ function App() {
 
         <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
           
-          {activeTab === 'lists' && (
+          {activeTab === 'lists' && !viewingDeck && (
             <section className={`max-w-5xl mx-auto ${(import.meta as any).env?.MODE !== 'test' ? 'animate-in fade-in' : ''}`}>
-              <h2 className="text-[10px] font-black uppercase tracking-[0.3em] mb-10 text-zinc-600">// INVENTORY_REGISTRY</h2>
+              <div className="flex justify-between items-end mb-10 border-b border-zinc-900 pb-6">
+                <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">// INVENTORY_REGISTRY</h2>
+                <button onClick={() => { setActiveTab('wizard'); resetWizard(); }} className="bg-[#8A3A34] text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all">
+                  [+ INITIATE_NEW_BUILD]
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-900 border border-zinc-900">
-                <div className="group p-8 bg-black border-b md:border-b-0 border-zinc-900 flex flex-col gap-4">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">// NEW_RECORD</h3>
-                  <input type="text" placeholder="ENTER_NAME..." value={newListName} onChange={(e) => setNewListName(e.target.value)} className="w-full bg-[#0F0F0F] border border-zinc-800 p-2 text-[10px] focus:outline-none focus:border-[#8A3A34] uppercase font-mono" />
-                  <button onClick={handleCreateList} className="w-full bg-zinc-900 text-[9px] font-black py-2 hover:bg-white hover:text-black transition-all uppercase">[EXECUTE_CREATE]</button>
-                </div>
                 {Array.isArray(lists) && lists.map(list => (
-                  <div key={list.id} className="group p-8 bg-black hover:bg-zinc-950 transition-all cursor-pointer border-b md:border-b-0 border-zinc-900">
+                  <div key={list.id} onClick={() => handleViewDeck(list.id)} className="group p-8 bg-black hover:bg-zinc-950 transition-all cursor-pointer border-b md:border-b-0 border-zinc-900 border-l-2 border-l-transparent hover:border-l-[#8A3A34] relative">
+                    <button 
+                      onClick={(e) => handleDeleteDeck(e, list.id)} 
+                      onMouseLeave={() => setConfirmingDeleteDeckId(null)}
+                      className={`absolute top-4 right-4 text-[8px] font-black transition-all uppercase tracking-widest ${confirmingDeleteDeckId === list.id ? 'opacity-100 text-white bg-[#8A3A34] px-2 py-1' : 'opacity-0 group-hover:opacity-100 text-zinc-700 hover:text-[#8A3A34]'}`}
+                    >
+                      {confirmingDeleteDeckId === list.id ? '[CONFIRM_ERASE?]' : '[ERASE_RECORD]'}
+                    </button>
                     <h3 className="font-black text-sm group-hover:text-[#8A3A34] tracking-widest uppercase mb-2">{list.name}</h3>
-                    <div className="flex justify-between items-center"><span className="text-[8px] text-zinc-700 font-bold">REC_ID: {list.id.slice(0, 8)}</span></div>
+                    <div className="flex justify-between items-center text-[8px] font-bold text-zinc-700">
+                      <span>REC_ID: {list.id.slice(0, 8)}</span>
+                      <span className="uppercase text-[#9E8C6A]">{list.format}</span>
+                    </div>
                   </div>
                 ))}
-                <div onClick={() => { setActiveTab('wizard'); resetWizard(); }} className="p-8 bg-black border-dashed border border-zinc-900 hover:bg-zinc-900 transition-all cursor-pointer flex items-center justify-center group">
-                  <span className="text-[9px] font-black text-zinc-700 uppercase tracking-widest group-hover:text-zinc-400">[+ NEW_GRIMOIRE]</span>
+                {(!lists || lists.length === 0) && (
+                  <div className="col-span-3 p-20 text-center bg-black">
+                    <p className="text-[10px] font-black text-zinc-800 uppercase tracking-[0.5em]">No_Records_Found_In_Master_Grimoire</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+          {activeTab === 'lists' && viewingDeck && (
+            <section className="max-w-6xl mx-auto animate-in fade-in duration-500 space-y-12 pb-24">
+              <div className="flex justify-between items-end border-b border-zinc-800 pb-6">
+                <div>
+                  <div className="flex items-center gap-4 mb-2">
+                    <button onClick={() => setViewingDeck(null)} className="text-[10px] font-black text-zinc-500 hover:text-white uppercase tracking-widest">[BACK_TO_REGISTRY]</button>
+                    <span className="text-zinc-800">/</span>
+                    <span className="text-[10px] font-black text-[#9E8C6A] uppercase tracking-widest">{viewingDeck.format}</span>
+                  </div>
+                  <h2 className="text-4xl font-black uppercase tracking-tighter">{viewingDeck.name}</h2>
+                </div>
+                <button className="bg-white text-black px-8 py-3 text-xs font-black uppercase tracking-widest hover:bg-[#8A3A34] hover:text-white transition-all">
+                  [INITIATE_BUY_SEQUENCE]
+                </button>
+              </div>
+
+              {/* DASHBOARD PERSISTENCE HANDLER */}
+              {!viewingDeck.analysis_json ? (
+                <div className="p-16 border-2 border-dashed border-zinc-900 bg-black flex flex-col items-center gap-6 animate-in zoom-in-95">
+                  <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.5em]">No_Structural_Diagnosis_Found</p>
+                  <button onClick={() => {
+                    const cards = viewingDeck.cards || [];
+                    const analysis = {
+                      manaCurve: [0, 1, 2, 3, 4, 5, 6, 7].map(c => cards.filter((i:any) => i.category !== 'LAND' && (i.cmc === c)).reduce((a:number,b:any)=>a+b.quantity, 0)),
+                      pillars: {
+                        LANDS: cards.filter((i:any) => i.category === 'LAND').reduce((a:number,b:any)=>a+b.quantity, 0),
+                        RAMP: cards.filter((i:any) => i.category === 'RAMP').reduce((a:number,b:any)=>a+b.quantity, 0),
+                        DRAW: cards.filter((i:any) => i.category === 'CARD_ADVANTAGE').reduce((a:number,b:any)=>a+b.quantity, 0),
+                        INTERACTION: cards.filter((i:any) => i.category === 'INTERACTION').reduce((a:number,b:any)=>a+b.quantity, 0),
+                      }
+                    };
+                    handleUpdateAnalysis(viewingDeck.id, analysis);
+                  }} className="bg-zinc-900 border border-zinc-800 text-[10px] font-black text-[#9E8C6A] px-10 py-4 uppercase tracking-widest hover:bg-white hover:text-black transition-all">
+                    [GENERATE_STRUCTURAL_DIAGNOSIS]
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in duration-1000">
+                  {/* MANA CURVE (Using Saved Data) */}
+                  <div className="p-8 border border-zinc-900 bg-black/20">
+                    <h4 className="text-xs font-black mb-8 uppercase tracking-widest text-zinc-500">// MANA_CURVE_DISTRIBUTION</h4>
+                    <div className="flex items-end justify-between h-48 gap-2">
+                      {JSON.parse(viewingDeck.analysis_json).manaCurve.map((count: number, cmc: number) => {
+                        const maxCount = Math.max(...JSON.parse(viewingDeck.analysis_json).manaCurve, 1);
+                        const height = (count / maxCount) * 100;
+                        return (
+                          <div key={cmc} className="flex-1 flex flex-col items-center gap-2">
+                            <div className="w-full bg-zinc-900 relative group">
+                              <div className="absolute bottom-0 left-0 w-full bg-[#8A3A34] transition-all duration-1000" style={{ height: `${height}%` }}></div>
+                              <div className="h-32"></div>
+                              <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-bold text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">{count}x</span>
+                            </div>
+                            <span className="text-[10px] font-black text-zinc-700">{cmc === 7 ? '7+' : cmc}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* PILLAR STATUS (Using Saved Data) */}
+                  <div className="p-8 border border-zinc-900 bg-black/20 space-y-6">
+                    <h4 className="text-xs font-black mb-8 uppercase tracking-widest text-zinc-500">// PILLAR_COMPLIANCE</h4>
+                    {Object.entries(JSON.parse(viewingDeck.analysis_json).pillars).map(([label, count]: [string, any]) => {
+                      const targets: any = { LANDS: viewingDeck.format === 'COMMANDER' ? 36 : 24, RAMP: viewingDeck.format === 'COMMANDER' ? 10 : 4, DRAW: viewingDeck.format === 'COMMANDER' ? 10 : 6, INTERACTION: viewingDeck.format === 'COMMANDER' ? 10 : 8 };
+                      const target = targets[label];
+                      const percent = Math.min((count / target) * 100, 100);
+                      return (
+                        <div key={label} className="space-y-2">
+                          <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter">
+                            <span className="text-zinc-400">{label}</span>
+                            <span className={count >= target ? 'text-green-500' : 'text-[#8A3A34]'}>{count} / {target}</span>
+                          </div>
+                          <div className="h-1 bg-zinc-900 overflow-hidden">
+                            <div className={`h-full transition-all duration-1000 ${count >= target ? 'bg-green-600' : 'bg-[#8A3A34]'}`} style={{ width: `${percent}%` }}></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* CARD LISTING (WIDE CARDS) */}
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 mb-8">// MASTER_DECK_LIST</h4>
+                <div className="grid grid-cols-1 gap-2">
+                  {(viewingDeck.cards || []).sort((a:any, b:any) => a.category.localeCompare(b.category)).map((card: any) => (
+                    <div key={card.id} className="flex items-center gap-6 p-3 bg-black border border-zinc-900 hover:border-zinc-700 transition-all group">
+                      <div className="w-12 h-12 bg-zinc-900 overflow-hidden grayscale group-hover:grayscale-0 transition-all">
+                        <img src={`https://cards.scryfall.io/normal/front/${card.card_id.charAt(0)}/${card.card_id.charAt(1)}/${card.card_id}.jpg`} alt={card.name} className="w-full h-full object-cover scale-150" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-black text-zinc-700">{card.quantity}x</span>
+                          <h5 className="text-xs font-bold uppercase truncate">{card.name}</h5>
+                        </div>
+                        <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mt-1">{card.category}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-[#9E8C6A]">R$ {card.price_brl?.replace('.',',') || '--'}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </section>
@@ -679,7 +915,10 @@ function App() {
                                   <h4 className="text-[9px] font-black text-[#9E8C6A] mb-4 uppercase border-b border-zinc-900 pb-2">Select_Edition_Tuning</h4>
                                   <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1">
                                     {item.allVersions.map(v => (
-                                      <div key={v.id} onClick={() => { const newDeck = [...wizardDeck]; newDeck[i].selectedVersion = v; setWizardDeck(newDeck); setActiveEditionSelector(null); }} className={`p-2 flex justify-between items-center hover:bg-zinc-900 cursor-pointer border ${item.selectedVersion.id === v.id ? 'border-[#9E8C6A]/40 bg-zinc-900' : 'border-transparent'}`}>
+                                      <div key={v.id} onClick={() => { 
+                                        setWizardDeck(prev => prev.map(wi => wi.uid === item.uid ? { ...wi, selectedVersion: v } : wi));
+                                        setActiveEditionSelector(null); 
+                                      }} className={`p-2 flex justify-between items-center hover:bg-zinc-900 cursor-pointer border ${item.selectedVersion.id === v.id ? 'border-[#9E8C6A]/40 bg-zinc-900' : 'border-transparent'}`}>
                                         <div className="flex flex-col"><span className="text-[9px] font-bold uppercase truncate max-w-[180px]">{v.setName}</span><span className="text-[7px] text-zinc-600 uppercase">{v.rarity}</span></div>
                                         <span className="text-[10px] font-black text-green-600">R$ {v.priceBRL?.replace('.',',') || '--'}</span>
                                       </div>
@@ -687,7 +926,19 @@ function App() {
                                   </div>
                                 </div>
                               )}
-                              <button onClick={() => handleRemoveCardFromWizard(i)} className="ml-4 text-[10px] text-zinc-700 hover:text-[#8A3A34] font-black">[X]</button>
+                              <button 
+                                onClick={() => {
+                                  if (confirmingRemoveCardUid === item.uid) {
+                                    handleRemoveCardFromWizard(item.uid);
+                                  } else {
+                                    setConfirmingRemoveCardUid(item.uid);
+                                  }
+                                }} 
+                                onMouseLeave={() => setConfirmingRemoveCardUid(null)}
+                                className={`ml-4 text-[10px] font-black transition-all ${confirmingRemoveCardUid === item.uid ? 'text-[#8A3A34] animate-pulse underline' : 'text-zinc-700 hover:text-[#8A3A34]'}`}
+                              >
+                                {confirmingRemoveCardUid === item.uid ? '[CONFIRM_REMOVE?]' : '[X]'}
+                              </button>
                             </div>
                           </div>
                         );
@@ -709,7 +960,7 @@ function App() {
                       <h4 className="font-black text-sm tracking-widest mb-2 group-hover:text-[#9E8C6A]">[01] RUN_DIAGNOSTICS</h4>
                       <p className="text-[8px] text-zinc-600 uppercase font-bold">Structural & Statistical Analysis</p>
                     </button>
-                    <button onClick={handleSaveDeck} className="p-10 border border-zinc-800 bg-[#0A0A0A] hover:border-green-700 group transition-all">
+                    <button onClick={() => setWizardStep(7)} className="p-10 border border-zinc-800 bg-[#0A0A0A] hover:border-green-700 group transition-all">
                       <h4 className="font-black text-sm tracking-widest mb-2 group-hover:text-green-600">[02] COMMIT_TO_GRIMOIRE</h4>
                       <p className="text-[8px] text-zinc-600 uppercase font-bold">Permanent SQLite Persistence</p>
                     </button>
@@ -724,17 +975,101 @@ function App() {
                     <h3 className="text-2xl font-black uppercase tracking-tighter">// STRUCTURAL_DIAGNOSIS</h3>
                     <div className="flex gap-2">
                       <button onClick={() => setWizardStep(5)} className="px-4 py-2 border border-zinc-800 text-[10px] font-black uppercase hover:bg-zinc-800">[BACK]</button>
-                      <button onClick={handleSaveDeck} className="px-6 py-2 bg-green-700 text-white font-black text-[10px] uppercase hover:bg-green-800">[SAVE_AFTER_ANALYSIS]</button>
+                      <button onClick={() => setWizardStep(7)} className="px-6 py-2 bg-green-700 text-white font-black text-[10px] uppercase hover:bg-green-800">[SAVE_AFTER_ANALYSIS]</button>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
                     <div className="p-6 border border-zinc-900 bg-black/40"><p className="text-[10px] font-black text-zinc-500 mb-4 uppercase tracking-widest">Deck_Value</p><p className="text-3xl font-black text-green-500">R$ {currentTotalCost.toFixed(2).replace('.',',')}</p></div>
                     <div className="p-6 border border-zinc-900 bg-black/40"><p className="text-[10px] font-black text-zinc-500 mb-4 uppercase tracking-widest">Card_Count</p><p className="text-3xl font-black text-[#9E8C6A]">{wizardDeck.reduce((a,b)=>a+b.quantity, 0)}</p></div>
                     <div className="p-6 border border-zinc-900 bg-black/40"><p className="text-[10px] font-black text-zinc-500 mb-4 uppercase tracking-widest">Budget_Usage</p><p className={`text-3xl font-black ${budgetStatus.exceeded ? 'text-[#8A3A34]' : 'text-green-500'}`}>{budgetStatus.percent.toFixed(1)}%</p></div>
-                  </div>
-                  <div className="p-10 border border-zinc-900 bg-black/20 text-center"><p className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.5em]">Detailed_Pillar_Analytics_Processing...</p></div>
-                </div>
-              )}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    {/* MANA CURVE */}
+                    <div className="p-8 border border-zinc-900 bg-black/20">
+                      <h4 className="text-xs font-black mb-8 uppercase tracking-widest text-zinc-500">// MANA_CURVE_DISTRIBUTION</h4>
+                      <div className="flex items-end justify-between h-48 gap-2">
+                        {[0, 1, 2, 3, 4, 5, 6, '7+'].map(cmc => {
+                          const count = wizardDeck
+                            .filter(item => item.selectedVersion.category !== 'LAND')
+                            .filter(item => cmc === '7+' ? (item.selectedVersion.cmc || 0) >= 7 : (item.selectedVersion.cmc || 0) === cmc)
+                            .reduce((acc, item) => acc + item.quantity, 0);
+                          const maxCount = Math.max(...[0, 1, 2, 3, 4, 5, 6, 7].map(c => wizardDeck.filter(i => i.selectedVersion.category !== 'LAND' && (i.selectedVersion.cmc === c)).reduce((a,b)=>a+b.quantity, 0)), 1);
+                          const height = (count / maxCount) * 100;
+                          return (
+                            <div key={cmc} className="flex-1 flex flex-col items-center gap-2">
+                              <div className="w-full bg-zinc-900 relative group">
+                                <div className="absolute bottom-0 left-0 w-full bg-[#8A3A34] transition-all duration-1000 group-hover:bg-[#9E8C6A]" style={{ height: `${height}%` }}></div>
+                                <div className="h-32"></div>
+                                <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-bold text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">{count}x</span>
+                              </div>
+                              <span className="text-[10px] font-black text-zinc-700">{cmc}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* PILLAR STATUS */}
+                    <div className="p-8 border border-zinc-900 bg-black/20 space-y-6">
+                      <h4 className="text-xs font-black mb-8 uppercase tracking-widest text-zinc-500">// PILLAR_COMPLIANCE</h4>
+                      {[
+                        { label: 'LANDS', cat: 'LAND', target: deckProfile.format === 'COMMANDER' ? 36 : 24 },
+                        { label: 'RAMP', cat: 'RAMP', target: deckProfile.format === 'COMMANDER' ? 10 : 4 },
+                        { label: 'DRAW', cat: 'CARD_ADVANTAGE', target: deckProfile.format === 'COMMANDER' ? 10 : 6 },
+                        { label: 'INTERACTION', cat: 'INTERACTION', target: deckProfile.format === 'COMMANDER' ? 10 : 8 },
+                      ].map(pillar => {
+                        const count = wizardDeck.filter(i => i.selectedVersion.category === pillar.cat).reduce((a,b)=>a+b.quantity, 0);
+                        const percent = Math.min((count / pillar.target) * 100, 100);
+                        return (
+                          <div key={pillar.label} className="space-y-2">
+                            <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter">
+                              <span className="text-zinc-400">{pillar.label}</span>
+                              <span className={count >= pillar.target ? 'text-green-500' : 'text-[#8A3A34]'}>{count} / {pillar.target}</span>
+                            </div>
+                            <div className="h-1 bg-zinc-900 overflow-hidden">
+                              <div className={`h-full transition-all duration-1000 ${count >= pillar.target ? 'bg-green-600' : 'bg-[#8A3A34]'}`} style={{ width: `${percent}%` }}></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    </div>
+                    </div>
+                    )}
+
+                    {wizardStep === 7 && (
+                    <div className="max-w-2xl mx-auto space-y-12 py-20 text-center animate-in zoom-in-95">
+                    <div className="space-y-4">
+                    <h3 className="text-4xl font-black tracking-tighter uppercase">Naming_Protocol</h3>
+                    <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Identify this record in the master database</p>
+                    </div>
+
+                    <div className="space-y-8">
+                    <div className="p-8 border border-zinc-800 bg-black/40 space-y-4">
+                      <p className="text-[10px] font-black text-[#9E8C6A] uppercase tracking-widest">Suggested_Identity</p>
+                      <p className="text-2xl font-black tracking-widest">{generateDeckName()}</p>
+                      <button onClick={() => handleSaveDeck(generateDeckName())} className="w-full bg-[#9E8C6A] text-black font-black p-4 uppercase tracking-widest hover:bg-white transition-all">[ACCEPT_SUGGESTION]</button>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="h-px flex-1 bg-zinc-900"></div>
+                      <span className="text-[8px] font-black text-zinc-700 uppercase">OR_MANUAL_OVERRIDE</span>
+                      <div className="h-px flex-1 bg-zinc-900"></div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input id="manual-name" type="text" placeholder="ENTER_UNIQUE_NAME..." className="flex-1 bg-black border border-zinc-800 p-4 focus:border-[#8A3A34] outline-none uppercase text-xs" />
+                      <button onClick={() => {
+                        const input = document.getElementById('manual-name') as HTMLInputElement;
+                        handleSaveDeck(input.value);
+                      }} className="bg-zinc-900 px-8 border border-zinc-800 text-[10px] font-black uppercase hover:bg-white hover:text-black">[COMMIT]</button>
+                    </div>
+                    </div>
+
+                    <button onClick={() => setWizardStep(5)} className="text-[10px] font-black text-zinc-700 hover:text-white uppercase tracking-widest mt-12 underline underline-offset-8">[CANCEL]</button>
+                    </div>
+                    )}
             </section>
           )}
         </main>
