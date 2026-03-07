@@ -1,5 +1,8 @@
 {
   "name": "front",
+  "description": "DogMagic List - Deck Construction Wizard",
+  "author": "Mateus <mateus@example.com>",
+  "homepage": "https://github.com/example/dogmagic",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -8,12 +11,42 @@
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
     "dev:renderer": "vite --no-open",
     "dev:electron": "wait-on http://localhost:5173 && tsc electron/main.ts electron/preload.ts --outDir electron --module commonjs --target esnext --allowJs true --skipLibCheck true && mv electron/main.js electron/main.cjs && mv electron/preload.js electron/preload.cjs && electron electron/main.cjs",
-    "build": "tsc && vite build",
+    "build:back": "node build-back.js",
+    "build": "tsc && vite build && npm run build:back && electron-builder --linux",
     "test": "vitest run"
   },
+  "build": {
+    "appId": "com.dogmagic.app",
+    "productName": "DogMagic",
+    "directories": {
+      "output": "release"
+    },
+    "extraResources": [
+      {
+        "from": "dist-back",
+        "to": "backend"
+      },
+      {
+        "from": ".puppeteer",
+        "to": ".puppeteer"
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    }
+  },
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "better-sqlite3": "^12.6.2",
+    "fastify": "^5.8.2",
+    "kysely": "^0.28.11",
+    "puppeteer": "^24.38.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
@@ -28,6 +61,7 @@
     "concurrently": "^9.1.2",
     "electron": "^34.3.0",
     "electron-builder": "^25.1.8",
+    "esbuild": "^0.27.3",
     "jsdom": "^26.0.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.0.0",
