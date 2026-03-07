@@ -9,7 +9,10 @@ lerna-debug.log*
 
 node_modules
 dist
-dist-ssr
+dist-back
+release
+.puppeteer
+electron/*.cjs
 *.local
 
 # Editor directories and files
