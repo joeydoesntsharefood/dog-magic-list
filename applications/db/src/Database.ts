@@ -7,6 +7,7 @@ interface ListTable {
   format: string | null;
   archetype: string | null;
   target_budget: number | null;
+  analysis_json: string | null; // NOVO: Persistência do Dashboard
   created_at: string;
 }
 
@@ -40,6 +41,7 @@ export class Database {
 
   constructor(path: string) {
     this.sqlite = new BetterSqlite3(path);
+    this.sqlite.pragma('foreign_keys = ON');
     this.db = new Kysely<DatabaseSchema>({
       dialect: new SqliteDialect({
         database: this.sqlite,
@@ -58,6 +60,20 @@ export class Database {
       .addColumn('target_budget', 'real')
       .addColumn('created_at', 'text', (col) => col.notNull())
       .execute();
+
+    // NOVO: Garantir colunas para bancos existentes
+    try {
+      await this.db.schema.alterTable('lists').addColumn('format', 'text').execute();
+    } catch (e) {}
+    try {
+      await this.db.schema.alterTable('lists').addColumn('archetype', 'text').execute();
+    } catch (e) {}
+    try {
+      await this.db.schema.alterTable('lists').addColumn('target_budget', 'real').execute();
+    } catch (e) {}
+    try {
+      await this.db.schema.alterTable('lists').addColumn('analysis_json', 'text').execute();
+    } catch (e) {}
 
     await this.db.schema
       .createTable('deck_cards')

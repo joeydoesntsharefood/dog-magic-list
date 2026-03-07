@@ -23,7 +23,10 @@ const deckRepo = new DeckRepository(db);
 const start = async () => {
   try {
     await db.migrate();
-    await server.register(cors, { origin: '*' });
+    await server.register(cors, { 
+      origin: '*',
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
+    });
 
     server.get('/lists', async () => await listRepo.getAllLists());
 
@@ -50,14 +53,48 @@ const start = async () => {
     });
 
     // NOVO: Endpoint para salvar Deck Completo (US03.7)
+    server.get('/decks/:id', async (request, reply) => {
+      const { id } = request.params as { id: string };
+      try {
+        const deck = await deckRepo.getDeckWithCards(id);
+        if (!deck) return reply.status(404).send({ error: 'Deck não encontrado' });
+        return deck;
+      } catch (e) {
+        return reply.status(500).send({ error: 'Erro ao carregar deck' });
+      }
+    });
+
+    server.delete('/decks/:id', async (request, reply) => {
+      const { id } = request.params as { id: string };
+      try {
+        await deckRepo.deleteDeck(id);
+        return reply.status(200).send({ success: true });
+      } catch (e: any) {
+        server.log.error(`DELETE_FAIL for deck ${id}: ${e.message}`);
+        return reply.status(500).send({ error: `Erro ao excluir deck: ${e.message}` });
+      }
+    });
+
+    server.patch('/decks/:id/analysis', async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const { analysis } = request.body as { analysis: any };
+      try {
+        await deckRepo.updateAnalysis(id, analysis);
+        return reply.status(200).send({ success: true });
+      } catch (e) {
+        return reply.status(500).send({ error: 'Erro ao salvar análise' });
+      }
+    });
+
     server.post('/decks', async (request, reply) => {
       const data = request.body as any;
       if (!data.name) return reply.status(400).send({ error: 'Nome do deck é obrigatório' });
       try {
         const result = await deckRepo.saveFullDeck(data);
         return reply.status(201).send(result);
-      } catch (e) {
-        return reply.status(500).send({ error: 'Erro ao salvar deck' });
+      } catch (e: any) {
+        server.log.error(`SAVE_FAIL: ${e.message}`);
+        return reply.status(500).send({ error: `Erro ao salvar deck: ${e.message}` });
       }
     });
 

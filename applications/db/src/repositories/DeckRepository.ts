@@ -70,4 +70,27 @@ export class DeckRepository {
 
     return { ...list, cards };
   }
+
+  async deleteDeck(id: string) {
+    return await this.database.db.transaction().execute(async (trx) => {
+      // Deletar cartas primeiro (caso o cascade não esteja ativo no banco legado)
+      await trx
+        .deleteFrom('deck_cards')
+        .where('list_id', '=', id)
+        .execute();
+
+      return await trx
+        .deleteFrom('lists')
+        .where('id', '=', id)
+        .execute();
+    });
+  }
+
+  async updateAnalysis(id: string, analysis: any) {
+    return await this.database.db
+      .updateTable('lists')
+      .set({ analysis_json: JSON.stringify(analysis) })
+      .where('id', '=', id)
+      .execute();
+  }
 }
