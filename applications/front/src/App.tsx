@@ -7,6 +7,7 @@ import InventoryGrid from './components/inventory/InventoryGrid';
 import DeckDetail from './components/inventory/DeckDetail';
 import SearchBar from './components/market/SearchBar';
 import MarketResult from './components/market/MarketResult';
+import WizardContainer from './components/wizard/WizardContainer';
 import { 
   List, CardSuggestion, CardVersion, CardPriceResult, 
   OffersResult, WizardDeckItem, DeckProfile, API_BASE_URL 
@@ -463,359 +464,43 @@ function App() {
           )}
 
           {activeTab === 'wizard' && (
-            <section className={`max-w-5xl mx-auto ${(import.meta as any).env?.MODE !== 'test' ? 'animate-in fade-in slide-in-from-bottom-4 duration-700' : ''} pb-24`}>
-              <div className="mb-12 flex justify-between items-center border-b border-zinc-800 pb-6">
-                <div>
-                  <h2 className="text-xl font-black uppercase tracking-tighter">DECK_WIZARD_PROMPT</h2>
-                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Status: Step_0{wizardStep + 1} / {deckProfile.format || 'INITIALIZING'}</p>
-                </div>
-                <div className="text-right flex flex-col items-end gap-2">
-                  <p className={`text-[10px] font-black ${budgetStatus.exceeded ? 'text-[#8A3A34] animate-pulse' : 'text-green-600'}`}>
-                    BUDGET_REMAINING: R$ {(deckProfile.targetBudget - currentTotalCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                  {wizardStep >= 4 && (
-                    <div className="flex gap-2">
-                      <button onClick={() => optimizeBudget('LOW')} className="bg-zinc-900 text-[8px] font-bold px-2 py-1 hover:bg-white hover:text-black transition-all">[LOW_COST_TUNING]</button>
-                      <button onClick={() => optimizeBudget('HIGH')} className="bg-zinc-900 text-[8px] font-bold px-2 py-1 hover:bg-white hover:text-black transition-all">[PREMIUM_TUNING]</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* WIZARD STEPS 0-6 */}
-              {wizardStep === 0 && (
-                <div className="space-y-8">
-                  <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest">// SELECT_DECK_FORMAT</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {['STANDARD', 'COMMANDER', 'PAUPER'].map(f => (
-                      <div key={f} onClick={() => { setDeckProfile({...deckProfile, format: f as any}); setWizardStep(1); }} className="p-10 border border-zinc-800 bg-[#0A0A0A] hover:border-[#8A3A34] cursor-pointer transition-all text-center group">
-                        <span className="font-black text-sm tracking-widest group-hover:text-[#8A3A34]">{f}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {wizardStep === 1 && (
-                <div className="space-y-12">
-                  <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-6">// INITIAL_CONFIGURATION</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                    <div className="space-y-6">
-                      <h4 className="text-[10px] font-black uppercase text-zinc-500">[01] SELECT_PROFILE</h4>
-                      <div className="flex gap-4">
-                        {['COMPETITIVE', 'FUN'].map(obj => (
-                          <button key={obj} onClick={() => setDeckProfile({...deckProfile, objective: obj as any})} className={`flex-1 p-4 border ${deckProfile.objective === obj ? 'bg-zinc-800 border-zinc-600' : 'border-zinc-800 hover:border-zinc-700'}`}>
-                            <span className="font-black text-[10px] tracking-widest">{obj}</span>
-                          </button>
-                        ))}
-                      </div>
-                      {deckProfile.objective && (
-                        <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-4">
-                          {['AGGRO', 'MIDRANGE', 'CONTROL', 'COMBO'].map(arc => (
-                            <div key={arc} onClick={() => { setDeckProfile({...deckProfile, archetype: arc as any}); setWizardStep(2); }} className="p-6 border border-zinc-800 bg-black hover:border-[#8A3A34] cursor-pointer text-center group">
-                              <span className="font-black text-[10px] tracking-widest group-hover:text-[#8A3A34]">{arc}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-6 border-l border-zinc-900 pl-12">
-                      <h4 className="text-[10px] font-black uppercase text-[#9E8C6A]">[02] BULK_IMPORT_TXT</h4>
-                      <textarea className="w-full h-48 bg-black border border-zinc-800 p-4 text-[10px] focus:border-[#9E8C6A] outline-none" placeholder="1 Sol Ring..." value={importText} onChange={(e) => setImportText(e.target.value)} />
-                      <button onClick={handleImportDeck} disabled={importing || !importText.trim()} className="w-full bg-zinc-900 text-[#9E8C6A] p-4 font-black uppercase text-[10px] hover:bg-white hover:text-black transition-all">{importing ? '[PROCESSING...]' : '[EXECUTE_BULK_IMPORT]'}</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {wizardStep === 2 && (
-                <div className="space-y-8 max-w-md mx-auto text-center">
-                  <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest">// SET_LIMIT_BRL</h3>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 font-bold">R$</span>
-                    <input type="number" placeholder="SET_LIMIT_BRL..." onChange={(e) => setDeckProfile({...deckProfile, targetBudget: parseFloat(e.target.value) || 0})} className="w-full bg-black border border-zinc-800 p-4 pl-12 focus:outline-none focus:border-[#8A3A34] text-xl font-black text-center" />
-                  </div>
-                  <button onClick={() => setWizardStep(deckProfile.format === 'COMMANDER' ? 3 : 4)} className="w-full bg-[#8A3A34] text-white p-4 font-black uppercase hover:bg-black border border-[#8A3A34] transition-all">
-                    {deckProfile.format === 'COMMANDER' ? '[PROCEED_TO_COMMANDER]' : '[INITIALIZE_CONSTRUCTION]'}
-                  </button>
-                </div>
-              )}
-
-              {wizardStep === 3 && (
-                <div className="space-y-8 max-w-2xl mx-auto">
-                  <h3 className="text-xs font-black text-[#9E8C6A] uppercase tracking-widest text-center">// DESIGNATE_COMMANDER</h3>
-                  <div className="relative flex gap-2">
-                    <input type="text" placeholder="QUERY_LEGENDARY..." onChange={(e) => setSearchName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearchCards()} className="flex-1 bg-black border border-zinc-800 p-4 focus:border-[#9E8C6A] outline-none text-xs uppercase" />
-                    <button onClick={handleSearchCards} className="bg-zinc-900 px-6 border border-zinc-800 text-[10px] font-black uppercase">Search</button>
-                  </div>
-                  <div className="max-h-60 overflow-y-auto border border-zinc-900 bg-black">
-                    {suggestions.map(card => (
-                      <div key={card.id} onClick={() => handleSelectCard(card.name)} className="p-4 border-b border-zinc-900 hover:bg-zinc-900 cursor-pointer text-xs font-bold flex justify-between uppercase">
-                        <span>{card.name}</span> <ColorIdentityDots colors={card.colors} />
-                      </div>
-                    ))}
-                  </div>
-                  {selectedVersion && (
-                    <div className="flex flex-col items-center gap-6 animate-in zoom-in-95">
-                      <div className="pixel-border border-2 border-zinc-800 p-1 bg-zinc-900 cursor-zoom-in" onDoubleClick={() => setExpandedCard(selectedVersion.imageUrl)}>
-                        <img src={selectedVersion.imageUrl} className="w-64 grayscale hover:grayscale-0 transition-all duration-700" />
-                      </div>
-                      <button onClick={() => { setDeckProfile({ ...deckProfile, commander: selectedVersion }); setWizardStep(4); setSearchResult(null); setSearchName(''); }} className="bg-white text-black px-10 py-4 font-black uppercase tracking-widest hover:bg-[#8A3A34] hover:text-white transition-all">
-                        [DESIGNATE_COMMANDER]
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {wizardStep === 4 && (
-                <div className="flex flex-col lg:flex-row gap-10 items-start">
-                  <div className="w-full lg:w-[320px] shrink-0 space-y-6 lg:sticky lg:top-0">
-                    {deckProfile.commander && (
-                      <div className="border border-[#9E8C6A]/20 bg-[#9E8C6A]/5 p-4 flex gap-4 items-center">
-                        <div className="w-16 h-16 grayscale border border-zinc-800 overflow-hidden cursor-zoom-in" onDoubleClick={() => setExpandedCard(deckProfile.commander?.imageUrl || null)}>
-                          <img src={deckProfile.commander.imageUrl} className="w-full h-full object-cover" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[8px] font-black text-[#9E8C6A] uppercase">Commander</p>
-                          <p className="text-[10px] font-bold uppercase truncate">{deckProfile.commander.name}</p>
-                          <ColorIdentityDots colors={deckProfile.commander.colorIdentity} />
-                        </div>
-                      </div>
-                    )}
-                    <input type="text" placeholder="ADD_CARD..." value={searchName} onChange={(e) => setSearchName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearchCards()} className="w-full bg-[#0F0F0F] border border-[#1C1C1C] p-3 text-[10px] focus:border-zinc-600 outline-none uppercase" />
-                    <div className="max-h-60 overflow-y-auto border border-zinc-900 bg-black">
-                      {suggestions.map(card => (
-                        <div key={card.id} onClick={() => handleSelectCard(card.name)} className="p-3 border-b border-zinc-900 hover:bg-zinc-900 cursor-pointer text-[10px] font-bold flex justify-between uppercase">
-                          <span>{card.name}</span> <ColorIdentityDots colors={card.colors} />
-                        </div>
-                      ))}
-                    </div>
-                    {selectedVersion && searchResult && (
-                      <div className="border border-zinc-800 p-4 bg-zinc-950 animate-in zoom-in-95">
-                        <div className="cursor-zoom-in mb-4" onDoubleClick={() => setExpandedCard(selectedVersion.imageUrl)}>
-                          <img src={selectedVersion.imageUrl} className="w-full grayscale hover:grayscale-0 transition-all duration-700" />
-                        </div>
-                        <div className="flex items-center justify-between mb-4 border border-zinc-800 p-2">
-                          <span className="text-[9px] font-black text-zinc-500 uppercase">Quantity</span>
-                          <div className="flex items-center gap-4">
-                            <button onClick={() => setWizardQuantity(Math.max(1, wizardQuantity-1))} className="text-zinc-500 hover:text-white px-2">[-]</button>
-                            <span className="text-xs font-black">{wizardQuantity}</span>
-                            <button onClick={() => {
-                              const isBasicLand = selectedVersion?.setName?.toLowerCase().includes('basic land') || ['Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Ilha', 'Pântano', 'Montanha', 'Floresta', 'Planície'].includes(selectedVersion.name);
-                              if (deckProfile.format !== 'COMMANDER' || isBasicLand) setWizardQuantity(wizardQuantity+1);
-                            }} disabled={deckProfile.format === 'COMMANDER' && !selectedVersion?.setName?.toLowerCase().includes('basic land') && !['Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Ilha', 'Pântano', 'Montanha', 'Floresta', 'Planície'].includes(selectedVersion.name)} className="text-zinc-500 hover:text-white px-2 disabled:opacity-20">[+]</button>
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center mb-4 text-[10px]">
-                          <ColorIdentityDots colors={selectedVersion.colorIdentity} /><span className="text-green-500 font-black">R$ {selectedVersion.priceBRL}</span>
-                        </div>
-                        <button onClick={() => handleAddCardToWizard(searchResult, selectedVersion)} className="w-full bg-zinc-800 text-[10px] font-black p-2 hover:bg-white hover:text-black uppercase">[COMMIT_TO_DECK]</button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 w-full space-y-8">
-                    <div className="flex flex-col gap-4 border-b border-zinc-900 pb-4">
-                      <div className="flex justify-between items-center font-black text-[10px] text-zinc-500 tracking-widest uppercase">
-                        <span>// DECK_REGISTRY</span> <span>{wizardDeck.reduce((a,b)=>a+b.quantity, 0)} CARDS</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <input type="text" placeholder="FILTER..." value={deckLocalFilter} onChange={(e) => setDeckLocalFilter(e.target.value)} className="flex-1 bg-black border border-zinc-800 p-2 text-[10px] focus:border-zinc-600 outline-none uppercase" />
-                        <button onClick={handlePurgeViolations} className="bg-zinc-900 border border-[#8A3A34] text-[#8A3A34] px-4 text-[8px] font-black uppercase hover:bg-[#8A3A34] hover:text-white transition-all">[PURGE]</button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-px bg-zinc-900 border border-zinc-900">
-                      {filteredDeck.map((item, i) => {
-                        const legality = validateCardLegality(item.selectedVersion);
-                        const validVersions = item.allVersions.filter(v => v.priceBRL && parseFloat(v.priceBRL) > 0);
-                        const avgPrice = validVersions.length > 0 ? validVersions.reduce((a,b)=>a + parseFloat(b.priceBRL || '0'), 0) / validVersions.length : 0;
-                        return (
-                          <div key={i} className={`p-4 bg-black flex justify-between items-center hover:bg-zinc-950 group border-l-4 ${legality.isLegal ? 'border-transparent' : 'border-[#8A3A34] animate-pulse'}`}>
-                            <div className="flex items-center gap-4">
-                              <span className="text-[8px] text-zinc-700 font-bold">{item.quantity}x</span>
-                              <div className="flex flex-col"><span className="text-xs font-bold uppercase cursor-zoom-in" onDoubleClick={() => setExpandedCard(item.selectedVersion.imageUrl)}>{item.selectedVersion.name}</span>
-                                {!legality.isLegal && <span className="text-[8px] text-[#8A3A34] font-black uppercase tracking-tighter">{legality.reason}</span>}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-6 relative">
-                              <div className="group relative">
-                                <div className="flex flex-col items-end cursor-pointer" onClick={(e) => { e.stopPropagation(); setActiveEditionSelector(activeEditionSelector === i ? null : i); }}>
-                                  <span className="text-[8px] font-bold text-zinc-600 uppercase">Avg: {avgPrice > 0 ? `R$ ${avgPrice.toFixed(2).replace('.',',')}` : '--'}</span>
-                                  <span className="text-xs font-black text-zinc-300">R$ {item.selectedVersion.priceBRL?.replace('.', ',') || '--'}</span>
-                                </div>
-                                <div className="absolute right-0 top-full mt-2 w-64 bg-black border border-zinc-800 z-50 hidden group-hover:block p-2 shadow-2xl">
-                                  <p className="text-[8px] font-black text-zinc-500 mb-2 border-b border-zinc-900 pb-1">AVAILABLE_EDITIONS</p>
-                                  {item.allVersions.slice(0, 5).map(v => (
-                                    <div key={v.id} className="flex justify-between text-[9px] mb-1">
-                                      <span className="truncate max-w-[150px]">{v.setName}</span>
-                                      <span className="font-bold text-zinc-400">R$ {v.priceBRL?.replace('.',',') || '--'}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              {activeEditionSelector === i && (
-                                <div className="absolute right-0 top-full mt-2 w-80 bg-[#0A0A0A] border border-[#9E8C6A] z-[60] p-4 shadow-2xl animate-in slide-in-from-top-2" onClick={(e)=>e.stopPropagation()}>
-                                  <h4 className="text-[9px] font-black text-[#9E8C6A] mb-4 uppercase border-b border-zinc-900 pb-2">Select_Edition_Tuning</h4>
-                                  <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1">
-                                    {item.allVersions.map(v => (
-                                      <div key={v.id} onClick={() => { 
-                                        setWizardDeck(prev => prev.map(wi => wi.uid === item.uid ? { ...wi, selectedVersion: v } : wi));
-                                        setActiveEditionSelector(null); 
-                                      }} className={`p-2 flex justify-between items-center hover:bg-zinc-900 cursor-pointer border ${item.selectedVersion.id === v.id ? 'border-[#9E8C6A]/40 bg-zinc-900' : 'border-transparent'}`}>
-                                        <div className="flex flex-col"><span className="text-[9px] font-bold uppercase truncate max-w-[180px]">{v.setName}</span><span className="text-[7px] text-zinc-600 uppercase">{v.rarity}</span></div>
-                                        <span className="text-[10px] font-black text-green-600">R$ {v.priceBRL?.replace('.',',') || '--'}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              <button 
-                                onClick={() => {
-                                  if (confirmingRemoveCardUid === item.uid) {
-                                    handleRemoveCardFromWizard(item.uid);
-                                  } else {
-                                    setConfirmingRemoveCardUid(item.uid);
-                                  }
-                                }} 
-                                onMouseLeave={() => setConfirmingRemoveCardUid(null)}
-                                className={`ml-4 text-[10px] font-black transition-all ${confirmingRemoveCardUid === item.uid ? 'text-[#8A3A34] animate-pulse underline' : 'text-zinc-700 hover:text-[#8A3A34]'}`}
-                              >
-                                {confirmingRemoveCardUid === item.uid ? '[CONFIRM_REMOVE?]' : '[X]'}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <button onClick={() => setWizardStep(5)} disabled={wizardDeck.length === 0} className="w-full bg-white text-black p-4 font-black uppercase tracking-widest hover:bg-[#8A3A34] hover:text-white transition-all disabled:opacity-20">[FINAL_DECISION_PROMPT]</button>
-                  </div>
-                </div>
-              )}
-
-              {wizardStep === 5 && (
-                <div className="max-w-2xl mx-auto space-y-12 py-20 text-center animate-in zoom-in-95 duration-500">
-                  <div className="space-y-4">
-                    <h3 className="text-4xl font-black tracking-tighter uppercase">Registry_Ready</h3>
-                    <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Select final procedure for this grimoire</p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <button onClick={() => setWizardStep(6)} className="p-10 border border-zinc-800 bg-[#0A0A0A] hover:border-[#9E8C6A] group transition-all">
-                      <h4 className="font-black text-sm tracking-widest mb-2 group-hover:text-[#9E8C6A]">[01] RUN_DIAGNOSTICS</h4>
-                      <p className="text-[8px] text-zinc-600 uppercase font-bold">Structural & Statistical Analysis</p>
-                    </button>
-                    <button onClick={() => setWizardStep(7)} className="p-10 border border-zinc-800 bg-[#0A0A0A] hover:border-green-700 group transition-all">
-                      <h4 className="font-black text-sm tracking-widest mb-2 group-hover:text-green-600">[02] COMMIT_TO_GRIMOIRE</h4>
-                      <p className="text-[8px] text-zinc-600 uppercase font-bold">Permanent SQLite Persistence</p>
-                    </button>
-                  </div>
-                  <button onClick={() => setWizardStep(4)} className="text-[10px] font-black text-zinc-700 hover:text-white uppercase tracking-widest mt-12 underline underline-offset-8">[BACK_TO_CONSTRUCTION]</button>
-                </div>
-              )}
-
-              {wizardStep === 6 && (
-                <div className="space-y-12 animate-in fade-in duration-700">
-                  <div className="flex justify-between items-end border-b border-zinc-800 pb-4">
-                    <h3 className="text-2xl font-black uppercase tracking-tighter">// STRUCTURAL_DIAGNOSIS</h3>
-                    <div className="flex gap-2">
-                      <button onClick={() => setWizardStep(5)} className="px-4 py-2 border border-zinc-800 text-[10px] font-black uppercase hover:bg-zinc-800">[BACK]</button>
-                      <button onClick={() => setWizardStep(7)} className="px-6 py-2 bg-green-700 text-white font-black text-[10px] uppercase hover:bg-green-800">[SAVE_AFTER_ANALYSIS]</button>
-                    </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-                    <div className="p-6 border border-zinc-900 bg-black/40"><p className="text-[10px] font-black text-zinc-500 mb-4 uppercase tracking-widest">Deck_Value</p><p className="text-3xl font-black text-green-500">R$ {currentTotalCost.toFixed(2).replace('.',',')}</p></div>
-                    <div className="p-6 border border-zinc-900 bg-black/40"><p className="text-[10px] font-black text-zinc-500 mb-4 uppercase tracking-widest">Card_Count</p><p className="text-3xl font-black text-[#9E8C6A]">{wizardDeck.reduce((a,b)=>a+b.quantity, 0)}</p></div>
-                    <div className="p-6 border border-zinc-900 bg-black/40"><p className="text-[10px] font-black text-zinc-500 mb-4 uppercase tracking-widest">Budget_Usage</p><p className={`text-3xl font-black ${budgetStatus.exceeded ? 'text-[#8A3A34]' : 'text-green-500'}`}>{budgetStatus.percent.toFixed(1)}%</p></div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    {/* MANA CURVE */}
-                    <div className="p-8 border border-zinc-900 bg-black/20">
-                      <h4 className="text-xs font-black mb-8 uppercase tracking-widest text-zinc-500">// MANA_CURVE_DISTRIBUTION</h4>
-                      <div className="flex items-end justify-between h-48 gap-2">
-                        {[0, 1, 2, 3, 4, 5, 6, '7+'].map(cmc => {
-                          const count = wizardDeck
-                            .filter(item => item.selectedVersion.category !== 'LAND')
-                            .filter(item => cmc === '7+' ? (item.selectedVersion.cmc || 0) >= 7 : (item.selectedVersion.cmc || 0) === cmc)
-                            .reduce((acc, item) => acc + item.quantity, 0);
-                          const maxCount = Math.max(...[0, 1, 2, 3, 4, 5, 6, 7].map(c => wizardDeck.filter(i => i.selectedVersion.category !== 'LAND' && (i.selectedVersion.cmc === c)).reduce((a,b)=>a+b.quantity, 0)), 1);
-                          const height = (count / maxCount) * 100;
-                          return (
-                            <div key={cmc} className="flex-1 flex flex-col items-center gap-2">
-                              <div className="w-full bg-zinc-900 relative group">
-                                <div className="absolute bottom-0 left-0 w-full bg-[#8A3A34] transition-all duration-1000 group-hover:bg-[#9E8C6A]" style={{ height: `${height}%` }}></div>
-                                <div className="h-32"></div>
-                                <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-bold text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">{count}x</span>
-                              </div>
-                              <span className="text-[10px] font-black text-zinc-700">{cmc}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* PILLAR STATUS */}
-                    <div className="p-8 border border-zinc-900 bg-black/20 space-y-6">
-                      <h4 className="text-xs font-black mb-8 uppercase tracking-widest text-zinc-500">// PILLAR_COMPLIANCE</h4>
-                      {[
-                        { label: 'LANDS', cat: 'LAND', target: deckProfile.format === 'COMMANDER' ? 36 : 24 },
-                        { label: 'RAMP', cat: 'RAMP', target: deckProfile.format === 'COMMANDER' ? 10 : 4 },
-                        { label: 'DRAW', cat: 'CARD_ADVANTAGE', target: deckProfile.format === 'COMMANDER' ? 10 : 6 },
-                        { label: 'INTERACTION', cat: 'INTERACTION', target: deckProfile.format === 'COMMANDER' ? 10 : 8 },
-                      ].map(pillar => {
-                        const count = wizardDeck.filter(i => i.selectedVersion.category === pillar.cat).reduce((a,b)=>a+b.quantity, 0);
-                        const percent = Math.min((count / pillar.target) * 100, 100);
-                        return (
-                          <div key={pillar.label} className="space-y-2">
-                            <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter">
-                              <span className="text-zinc-400">{pillar.label}</span>
-                              <span className={count >= pillar.target ? 'text-green-500' : 'text-[#8A3A34]'}>{count} / {pillar.target}</span>
-                            </div>
-                            <div className="h-1 bg-zinc-900 overflow-hidden">
-                              <div className={`h-full transition-all duration-1000 ${count >= pillar.target ? 'bg-green-600' : 'bg-[#8A3A34]'}`} style={{ width: `${percent}%` }}></div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    </div>
-                    </div>
-                    )}
-
-                    {wizardStep === 7 && (
-                    <div className="max-w-2xl mx-auto space-y-12 py-20 text-center animate-in zoom-in-95">
-                    <div className="space-y-4">
-                    <h3 className="text-4xl font-black tracking-tighter uppercase">Naming_Protocol</h3>
-                    <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Identify this record in the master database</p>
-                    </div>
-
-                    <div className="space-y-8">
-                    <div className="p-8 border border-zinc-800 bg-black/40 space-y-4">
-                      <p className="text-[10px] font-black text-[#9E8C6A] uppercase tracking-widest">Suggested_Identity</p>
-                      <p className="text-2xl font-black tracking-widest">{generateDeckName()}</p>
-                      <button onClick={() => handleSaveDeck(generateDeckName())} className="w-full bg-[#9E8C6A] text-black font-black p-4 uppercase tracking-widest hover:bg-white transition-all">[ACCEPT_SUGGESTION]</button>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                      <div className="h-px flex-1 bg-zinc-900"></div>
-                      <span className="text-[8px] font-black text-zinc-700 uppercase">OR_MANUAL_OVERRIDE</span>
-                      <div className="h-px flex-1 bg-zinc-900"></div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <input id="manual-name" type="text" placeholder="ENTER_UNIQUE_NAME..." className="flex-1 bg-black border border-zinc-800 p-4 focus:border-[#8A3A34] outline-none uppercase text-xs" />
-                      <button onClick={() => {
-                        const input = document.getElementById('manual-name') as HTMLInputElement;
-                        handleSaveDeck(input.value);
-                      }} className="bg-zinc-900 px-8 border border-zinc-800 text-[10px] font-black uppercase hover:bg-white hover:text-black">[COMMIT]</button>
-                    </div>
-                    </div>
-
-                    <button onClick={() => setWizardStep(5)} className="text-[10px] font-black text-zinc-700 hover:text-white uppercase tracking-widest mt-12 underline underline-offset-8">[CANCEL]</button>
-                    </div>
-                    )}
-            </section>
+            <WizardContainer 
+              wizardStep={wizardStep}
+              setWizardStep={setWizardStep}
+              deckProfile={deckProfile}
+              setDeckProfile={setDeckProfile}
+              wizardDeck={wizardDeck}
+              setWizardDeck={setWizardDeck}
+              searchName={searchName}
+              setSearchName={setSearchName}
+              onSearchCards={handleSearchCards}
+              suggestions={suggestions}
+              onSelectCard={handleSelectCard}
+              selectedVersion={selectedVersion}
+              searchResult={searchResult}
+              wizardQuantity={wizardQuantity}
+              setWizardQuantity={setWizardQuantity}
+              onAddCard={handleAddCardToWizard}
+              importText={importText}
+              setImportText={setImportText}
+              onImportDeck={handleImportDeck}
+              importing={importing}
+              deckLocalFilter={deckLocalFilter}
+              setDeckLocalFilter={setDeckLocalFilter}
+              onPurgeViolations={handlePurgeViolations}
+              onRemoveCard={handleRemoveCardFromWizard}
+              setExpandedCard={setExpandedCard}
+              validateCardLegality={validateCardLegality}
+              currentTotalCost={currentTotalCost}
+              budgetStatus={budgetStatus}
+              onOptimizeBudget={optimizeBudget}
+              onSaveDeck={handleSaveDeck}
+              generateDeckName={generateDeckName}
+              confirmingRemoveCardUid={confirmingRemoveCardUid}
+              setConfirmingRemoveCardUid={setConfirmingRemoveCardUid}
+              activeEditionSelector={activeEditionSelector}
+              setActiveEditionSelector={setActiveEditionSelector}
+            />
           )}
         </main>
       </div>
