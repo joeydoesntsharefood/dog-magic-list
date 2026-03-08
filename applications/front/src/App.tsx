@@ -1,86 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { themes } from './themes';
-
-// --- COMPONENTES AUXILIARES ---
-const MatrixRain = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*()';
-    const fontSize = 14;
-    const columns = canvas.width / fontSize;
-    const drops: number[] = Array(Math.floor(columns)).fill(1);
-    const draw = () => {
-      ctx.fillStyle = 'rgba(10, 10, 10, 0.1)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#9E8C6A';
-      ctx.font = `${fontSize}px monospace`;
-      for (let i = 0; i < drops.length; i++) {
-        const text = characters.charAt(Math.floor(Math.random() * characters.length));
-        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
-        drops[i]++;
-      }
-    };
-    const interval = setInterval(draw, 33);
-    return () => clearInterval(interval);
-  }, []);
-  return <canvas ref={canvasRef} className="fixed top-0 left-0 w-full h-full opacity-20 pointer-events-none" />;
-};
-
-const ColorIdentityDots = ({ colors = [] }: { colors?: string[] }) => {
-  const colorMap: Record<string, string> = {
-    'W': 'mtg-white', 'U': 'mtg-blue', 'B': 'mtg-black', 'R': 'mtg-red', 'G': 'mtg-green'
-  };
-  return (
-    <div className="flex gap-1">
-      {(colors || []).length === 0 ? (
-        <div className="w-2 h-2 rounded-full mtg-colorless" title="Colorless"></div>
-      ) : (
-        colors.map(c => <div key={c} className={`w-2 h-2 rounded-full ${colorMap[c] || 'bg-zinc-500'}`} title={c}></div>)
-      )}
-    </div>
-  );
-};
-
-// --- TIPAGENS ---
-interface List { id: string; name: string; format?: string; archetype?: string; target_budget?: number; }
-interface CardSuggestion { id: string; name: string; mana_cost: string; colors: string[]; }
-interface CardVersion {
-  id: string; name: string; setName: string; setCode: string; rarity: string;
-  priceUSD: string | null; priceFoilUSD: string | null;
-  priceBRL: string | null; priceFoilBRL: string | null;
-  imageUrl: string; scryfallUri: string; category: string;
-  cmc: number;
-  legalities: Record<string, string>; colorIdentity: string[];
-}
-interface CardPriceResult { name: string; versions: CardVersion[]; }
-interface LigaMagicOffer { storeName: string; storeLogo: string; price: string; availability: string; link: string; }
-interface LigaMagicOption { name: string; setName: string; link: string; }
-interface OffersResult { avgPrice: string | null; offers: LigaMagicOffer[]; options?: LigaMagicOption[]; updatedAt: string | null; fromCache?: boolean; }
-
-interface WizardDeckItem {
-  uid: string;
-  allVersions: CardVersion[];
-  selectedVersion: CardVersion;
-  quantity: number;
-}
-
-interface DeckProfile {
-  format: 'STANDARD' | 'COMMANDER' | 'PAUPER' | null;
-  objective: 'COMPETITIVE' | 'FUN' | null;
-  archetype: 'AGGRO' | 'MIDRANGE' | 'CONTROL' | 'COMBO' | null;
-  targetBudget: number;
-  commander?: CardVersion | null;
-}
-
-const API_BASE_URL = 'http://localhost:3001';
-const currentTheme = themes.default.colors;
+import Sidebar from './components/layout/Sidebar';
+import MatrixRain from './components/shared/MatrixRain';
+import ColorIdentityDots from './components/shared/ColorIdentityDots';
+import InventoryGrid from './components/inventory/InventoryGrid';
+import DeckDetail from './components/inventory/DeckDetail';
+import SearchBar from './components/market/SearchBar';
+import MarketResult from './components/market/MarketResult';
+import { 
+  List, CardSuggestion, CardVersion, CardPriceResult, 
+  OffersResult, WizardDeckItem, DeckProfile, API_BASE_URL 
+} from './types';
 
 function App() {
   const [loading, setLoading] = useState(!((import.meta as any).env?.MODE === 'test'));
@@ -480,239 +410,54 @@ function App() {
       )}
 
       <div className="flex h-screen overflow-hidden">
-        <aside className="w-64 border-r border-[#1C1C1C] p-6 flex flex-col gap-8 bg-[#050505]">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-lg font-black tracking-tighter uppercase animate-glitch-color">DogMagic</h1>
-            <span className="text-[9px] uppercase font-bold px-2 py-0.5 border border-[#1C1C1C] w-fit text-[#9E8C6A]">sys_build: 1.1.0</span>
-          </div>
-          <nav className="flex flex-col gap-2">
-            <button onClick={() => setActiveTab('lists')} className={`text-left px-3 py-2 text-xs transition-all border ${activeTab === 'lists' ? 'bg-zinc-800 text-white border-zinc-700' : 'border-transparent hover:bg-zinc-900'}`}>[01] INVENTORY</button>
-            <button onClick={() => setActiveTab('search')} className={`text-left px-3 py-2 text-xs transition-all border ${activeTab === 'search' ? 'bg-zinc-800 text-white border-zinc-700' : 'border-transparent hover:bg-zinc-900'}`}>[02] MARKET</button>
-            <button onClick={() => { setActiveTab('wizard'); resetWizard(); }} className={`text-left px-3 py-2 text-xs transition-all border ${activeTab === 'wizard' ? 'bg-[#8A3A34] text-white border-[#8A3A34]' : 'border-transparent hover:bg-zinc-900'}`}>[03] WIZARD</button>
-          </nav>
-        </aside>
+        <Sidebar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          onResetWizard={resetWizard} 
+        />
 
         <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
           
           {activeTab === 'lists' && !viewingDeck && (
-            <section className={`max-w-5xl mx-auto ${(import.meta as any).env?.MODE !== 'test' ? 'animate-in fade-in' : ''}`}>
-              <div className="flex justify-between items-end mb-10 border-b border-zinc-900 pb-6">
-                <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">// INVENTORY_REGISTRY</h2>
-                <button onClick={() => { setActiveTab('wizard'); resetWizard(); }} className="bg-[#8A3A34] text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all">
-                  [+ INITIATE_NEW_BUILD]
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-900 border border-zinc-900">
-                {Array.isArray(lists) && lists.map(list => (
-                  <div key={list.id} onClick={() => handleViewDeck(list.id)} className="group p-8 bg-black hover:bg-zinc-950 transition-all cursor-pointer border-b md:border-b-0 border-zinc-900 border-l-2 border-l-transparent hover:border-l-[#8A3A34] relative">
-                    <button 
-                      onClick={(e) => handleDeleteDeck(e, list.id)} 
-                      onMouseLeave={() => setConfirmingDeleteDeckId(null)}
-                      className={`absolute top-4 right-4 text-[8px] font-black transition-all uppercase tracking-widest ${confirmingDeleteDeckId === list.id ? 'opacity-100 text-white bg-[#8A3A34] px-2 py-1' : 'opacity-0 group-hover:opacity-100 text-zinc-700 hover:text-[#8A3A34]'}`}
-                    >
-                      {confirmingDeleteDeckId === list.id ? '[CONFIRM_ERASE?]' : '[ERASE_RECORD]'}
-                    </button>
-                    <h3 className="font-black text-sm group-hover:text-[#8A3A34] tracking-widest uppercase mb-2">{list.name}</h3>
-                    <div className="flex justify-between items-center text-[8px] font-bold text-zinc-700">
-                      <span>REC_ID: {list.id.slice(0, 8)}</span>
-                      <span className="uppercase text-[#9E8C6A]">{list.format}</span>
-                    </div>
-                  </div>
-                ))}
-                {(!lists || lists.length === 0) && (
-                  <div className="col-span-3 p-20 text-center bg-black">
-                    <p className="text-[10px] font-black text-zinc-800 uppercase tracking-[0.5em]">No_Records_Found_In_Master_Grimoire</p>
-                  </div>
-                )}
-              </div>
-            </section>
+            <InventoryGrid 
+              lists={lists}
+              onViewDeck={handleViewDeck}
+              onDeleteDeck={handleDeleteDeck}
+              onInitiateNewBuild={() => { setActiveTab('wizard'); resetWizard(); }}
+              confirmingDeleteDeckId={confirmingDeleteDeckId}
+              setConfirmingDeleteDeckId={setConfirmingDeleteDeckId}
+            />
           )}
           {activeTab === 'lists' && viewingDeck && (
-            <section className="max-w-6xl mx-auto animate-in fade-in duration-500 space-y-12 pb-24">
-              <div className="flex justify-between items-end border-b border-zinc-800 pb-6">
-                <div>
-                  <div className="flex items-center gap-4 mb-2">
-                    <button onClick={() => setViewingDeck(null)} className="text-[10px] font-black text-zinc-500 hover:text-white uppercase tracking-widest">[BACK_TO_REGISTRY]</button>
-                    <span className="text-zinc-800">/</span>
-                    <span className="text-[10px] font-black text-[#9E8C6A] uppercase tracking-widest">{viewingDeck.format}</span>
-                  </div>
-                  <h2 className="text-4xl font-black uppercase tracking-tighter">{viewingDeck.name}</h2>
-                </div>
-                <button className="bg-white text-black px-8 py-3 text-xs font-black uppercase tracking-widest hover:bg-[#8A3A34] hover:text-white transition-all">
-                  [INITIATE_BUY_SEQUENCE]
-                </button>
-              </div>
-
-              {/* DASHBOARD PERSISTENCE HANDLER */}
-              {!viewingDeck.analysis_json ? (
-                <div className="p-16 border-2 border-dashed border-zinc-900 bg-black flex flex-col items-center gap-6 animate-in zoom-in-95">
-                  <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.5em]">No_Structural_Diagnosis_Found</p>
-                  <button onClick={() => {
-                    const cards = viewingDeck.cards || [];
-                    const analysis = {
-                      manaCurve: [0, 1, 2, 3, 4, 5, 6, 7].map(c => cards.filter((i:any) => i.category !== 'LAND' && (i.cmc === c)).reduce((a:number,b:any)=>a+b.quantity, 0)),
-                      pillars: {
-                        LANDS: cards.filter((i:any) => i.category === 'LAND').reduce((a:number,b:any)=>a+b.quantity, 0),
-                        RAMP: cards.filter((i:any) => i.category === 'RAMP').reduce((a:number,b:any)=>a+b.quantity, 0),
-                        DRAW: cards.filter((i:any) => i.category === 'CARD_ADVANTAGE').reduce((a:number,b:any)=>a+b.quantity, 0),
-                        INTERACTION: cards.filter((i:any) => i.category === 'INTERACTION').reduce((a:number,b:any)=>a+b.quantity, 0),
-                      }
-                    };
-                    handleUpdateAnalysis(viewingDeck.id, analysis);
-                  }} className="bg-zinc-900 border border-zinc-800 text-[10px] font-black text-[#9E8C6A] px-10 py-4 uppercase tracking-widest hover:bg-white hover:text-black transition-all">
-                    [GENERATE_STRUCTURAL_DIAGNOSIS]
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in duration-1000">
-                  {/* MANA CURVE (Using Saved Data) */}
-                  <div className="p-8 border border-zinc-900 bg-black/20">
-                    <h4 className="text-xs font-black mb-8 uppercase tracking-widest text-zinc-500">// MANA_CURVE_DISTRIBUTION</h4>
-                    <div className="flex items-end justify-between h-48 gap-2">
-                      {JSON.parse(viewingDeck.analysis_json).manaCurve.map((count: number, cmc: number) => {
-                        const maxCount = Math.max(...JSON.parse(viewingDeck.analysis_json).manaCurve, 1);
-                        const height = (count / maxCount) * 100;
-                        return (
-                          <div key={cmc} className="flex-1 flex flex-col items-center gap-2">
-                            <div className="w-full bg-zinc-900 relative group">
-                              <div className="absolute bottom-0 left-0 w-full bg-[#8A3A34] transition-all duration-1000" style={{ height: `${height}%` }}></div>
-                              <div className="h-32"></div>
-                              <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-bold text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">{count}x</span>
-                            </div>
-                            <span className="text-[10px] font-black text-zinc-700">{cmc === 7 ? '7+' : cmc}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* PILLAR STATUS (Using Saved Data) */}
-                  <div className="p-8 border border-zinc-900 bg-black/20 space-y-6">
-                    <h4 className="text-xs font-black mb-8 uppercase tracking-widest text-zinc-500">// PILLAR_COMPLIANCE</h4>
-                    {Object.entries(JSON.parse(viewingDeck.analysis_json).pillars).map(([label, count]: [string, any]) => {
-                      const targets: any = { LANDS: viewingDeck.format === 'COMMANDER' ? 36 : 24, RAMP: viewingDeck.format === 'COMMANDER' ? 10 : 4, DRAW: viewingDeck.format === 'COMMANDER' ? 10 : 6, INTERACTION: viewingDeck.format === 'COMMANDER' ? 10 : 8 };
-                      const target = targets[label];
-                      const percent = Math.min((count / target) * 100, 100);
-                      return (
-                        <div key={label} className="space-y-2">
-                          <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter">
-                            <span className="text-zinc-400">{label}</span>
-                            <span className={count >= target ? 'text-green-500' : 'text-[#8A3A34]'}>{count} / {target}</span>
-                          </div>
-                          <div className="h-1 bg-zinc-900 overflow-hidden">
-                            <div className={`h-full transition-all duration-1000 ${count >= target ? 'bg-green-600' : 'bg-[#8A3A34]'}`} style={{ width: `${percent}%` }}></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* CARD LISTING (WIDE CARDS) */}
-              <div className="space-y-4">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 mb-8">// MASTER_DECK_LIST</h4>
-                <div className="grid grid-cols-1 gap-2">
-                  {(viewingDeck.cards || []).sort((a:any, b:any) => a.category.localeCompare(b.category)).map((card: any) => (
-                    <div key={card.id} className="flex items-center gap-6 p-3 bg-black border border-zinc-900 hover:border-zinc-700 transition-all group">
-                      <div className="w-12 h-12 bg-zinc-900 overflow-hidden grayscale group-hover:grayscale-0 transition-all">
-                        <img src={`https://cards.scryfall.io/normal/front/${card.card_id.charAt(0)}/${card.card_id.charAt(1)}/${card.card_id}.jpg`} alt={card.name} className="w-full h-full object-cover scale-150" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-black text-zinc-700">{card.quantity}x</span>
-                          <h5 className="text-xs font-bold uppercase truncate">{card.name}</h5>
-                        </div>
-                        <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mt-1">{card.category}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-black text-[#9E8C6A]">R$ {card.price_brl?.replace('.',',') || '--'}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
+            <DeckDetail 
+              deck={viewingDeck}
+              onBack={() => setViewingDeck(null)}
+              onUpdateAnalysis={handleUpdateAnalysis}
+              onInitiateBuy={() => showError('BUY_SEQUENCE_NOT_IMPLEMENTED')}
+            />
           )}
 
           {activeTab === 'search' && (
-            <section className={`max-w-5xl mx-auto ${(import.meta as any).env?.MODE !== 'test' ? 'animate-in fade-in duration-500' : ''}`}>
-              <div className="mb-12 flex gap-2">
-                <div className="flex-1">
-                  <h2 className="text-[10px] font-black uppercase tracking-[0.3em] mb-4 text-zinc-500">// INPUT_PROMPT</h2>
-                  <div className="relative group">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 font-bold">{`>>`}</span>
-                    <input type="text" placeholder="INITIATE_SEARCH..." value={searchName} onChange={(e) => setSearchName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearchCards()} className="w-full bg-[#0F0F0F] border border-[#1C1C1C] p-4 pl-12 focus:outline-none focus:border-zinc-600 transition-all uppercase text-xs tracking-widest" />
-                  </div>
-                </div>
-                <div className="flex flex-col justify-end">
-                  <button onClick={handleSearchCards} disabled={searching} className="h-[52px] px-8 bg-zinc-900 border border-zinc-800 text-[10px] font-black hover:bg-white hover:text-black transition-all disabled:opacity-30 uppercase tracking-widest">
-                    {searching ? '[BUSY...]' : '[INITIATE_SCAN]'}
-                  </button>
-                </div>
-              </div>
-              {suggestions.length > 0 && (
-                <div className="mb-12 border border-[#1C1C1C] bg-black">
-                  <div className="p-2 px-4 border-b border-zinc-900 text-[9px] font-black uppercase tracking-widest text-zinc-500">CANDIDATES_STREAM</div>
-                  {suggestions.map(card => (
-                    <div key={card.id} onClick={() => handleSelectCard(card.name)} className="p-4 border-b border-zinc-900 last:border-0 hover:bg-zinc-900 cursor-pointer flex justify-between items-center transition-colors">
-                      <span className="text-xs font-bold uppercase">{card.name}</span>
-                      <ColorIdentityDots colors={card.colors} />
-                    </div>
-                  ))}
-                </div>
-              )}
+            <section className="max-w-5xl mx-auto">
+              <SearchBar 
+                searchName={searchName}
+                setSearchName={setSearchName}
+                onSearch={handleSearchCards}
+                searching={searching}
+                suggestions={suggestions}
+                onSelectSuggestion={handleSelectCard}
+              />
 
               {searchResult && selectedVersion && (
-                <div className="flex flex-col xl:flex-row gap-12 items-start animate-in fade-in duration-700">
-                  <div className="w-full xl:w-[300px] shrink-0 xl:sticky xl:top-0">
-                    <div className="pixel-border border-2 border-zinc-800 p-1 bg-zinc-900 cursor-zoom-in" onDoubleClick={() => setExpandedCard(selectedVersion.imageUrl)}>
-                      <img src={selectedVersion.imageUrl} alt={searchResult.name} className="w-full grayscale hover:grayscale-0 transition-all duration-700" />
-                    </div>
-                    {offersData?.avgPrice && (
-                      <div className="mt-6 border border-green-900 bg-green-900/10 p-4">
-                        <p className="text-[9px] font-bold text-green-500 mb-1 tracking-widest uppercase">Avg_Local_Price</p>
-                        <p className="text-xl font-black text-green-400">{offersData.avgPrice}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0 w-full space-y-12">
-                    <div>
-                      <div className="flex items-end justify-between mb-8 border-b border-zinc-800 pb-4">
-                        <h3 className="text-3xl font-black tracking-tight uppercase">{searchResult.name}</h3>
-                        <div className="flex gap-2">
-                          {loadingOffers ? (
-                            <span className="text-[10px] font-bold text-zinc-500 animate-pulse uppercase tracking-widest">[SYNCHRONIZING_MARKET...]</span>
-                          ) : (
-                            <button onClick={() => fetchOffers(searchResult.name, selectedVersion.id, true)} className="px-4 py-2 border border-zinc-800 text-zinc-500 text-[9px] font-bold uppercase hover:bg-zinc-800 hover:text-white transition-all">
-                              [RE_SCAN]
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="border border-zinc-900 bg-black overflow-hidden">
-                        <table className="w-full text-left text-[10px]">
-                          <thead className="bg-zinc-900/50 text-zinc-500 font-black uppercase tracking-widest sticky top-0">
-                            <tr><th className="p-4">EDITION_SET</th><th className="p-4">RARITY</th><th className="p-4 text-right">NORMAL_BRL</th><th className="p-4 text-right">FOIL_BRL</th></tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-900">
-                            {searchResult.versions.map(v => (
-                              <tr key={v.id} onClick={() => handleVersionChange(v)} className={`hover:bg-zinc-900 cursor-pointer ${selectedVersion.id === v.id ? 'bg-zinc-900/40' : ''}`}>
-                                <td className="p-4 font-bold opacity-70">{v.setName}</td>
-                                <td className="p-4 font-bold opacity-40 uppercase">{v.rarity}</td>
-                                <td className="p-4 text-right font-black text-zinc-300">{v.priceBRL ? `R$ ${v.priceBRL.replace('.', ',')}` : '--'}</td>
-                                <td className="p-4 text-right font-black text-[#8A3A34]">{v.priceFoilBRL ? `R$ ${v.priceFoilBRL.replace('.', ',')}` : '--'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <MarketResult 
+                  searchResult={searchResult}
+                  selectedVersion={selectedVersion}
+                  onVersionChange={handleVersionChange}
+                  onFetchOffers={fetchOffers}
+                  loadingOffers={loadingOffers}
+                  offersData={offersData}
+                  onImageDoubleClick={setExpandedCard}
+                />
               )}
             </section>
           )}
