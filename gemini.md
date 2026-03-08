@@ -1,27 +1,16 @@
-# Diretrizes Gemini - Dog Magic List
+# GEMINI.md - Memória do Projeto Dog Magic List
 
-Este documento define as regras de desenvolvimento e conduta para o agente Gemini neste projeto.
+## Identidade e Tom de Voz
+- **Relacionamento:** Pair Programmers / Amigos.
+- **Tratamento:** Chame o usuário de "amigo" e trabalhe de forma colaborativa e estratégica.
 
-## 1. Metodologia TDI & Qualidade (MANDATÓRIO)
-O desenvolvimento segue o ciclo: **Testes Unitários -> Implementação -> Refatoração -> Testes de Integração.**
-*   **VALIDAÇÃO OBRIGATÓRIA:** Após **QUALQUER** alteração de código, o agente deve obrigatoriamente executar:
-    1.  `npm run typecheck` (ou `tsc --noEmit`) para garantir integridade de tipos.
-    2.  `npm run test` para garantir que não houve regressões comportamentais.
-*   Nenhuma tarefa é considerada concluída sem o log de sucesso de ambos os comandos.
+## Mandatos Específicos
+- **Arquitetura Híbrida:** Manter a separação clara entre Backend-Local (Electron Sidecar/Worker) e Backend-Global (API Cloud/Orquestrador).
+- **Metodologia TDI:** Todo novo componente ou funcionalidade deve ser acompanhado de um arquivo de teste (.test.tsx / .test.ts).
+- **Design System:** Priorizar o uso de Tokens CSS para suportar múltiplos temas dinâmicos via Tailwind.
+- **Scraping Ético:** Utilizar o scraping residencial (local) como fonte para o cache colaborativo (global).
 
-## 2. Padrões Tecnológicos
-*   **Stack:** Electron (Frontend), Node.js/Fastify (Backend), React, TypeScript, Tailwind CSS v4.
-*   **Comunicação:** API REST local (`http://localhost:3001`). 
-*   **Dados:** SQLite para persistência das listas de usuários.
-*   **Imagens:** Consumo direto via API do Scryfall (sem cache local).
-*   **Interface:** Estética "D2D Terminal" (Monoespaçada, Minimalista, Dark).
-
-## 3. UI & Design
-*   **Temas:** Seguir a paleta oficial (`assets/pallet.json`) e o sistema de temas em `src/themes.ts`.
-*   **Identidade:** Logo em Splash Screen com efeito Glitch e Matrix Rain.
-*   **Feedback:** Notificações nativas do sistema e Toasts na UI para erros/sucessos.
-
-## 4. Metas
-*   Suporte a múltiplas versões de cartas com tabelas de preços detalhadas.
-*   Busca multilíngue e resiliente (fuzzy/search).
-*   Marketplace em tempo real via Puppeteer com sistema de cache.
+## Histórico de Decisões Arquiteturais
+- **Migração Cloud:** Decidido mover banco de dados para a nuvem (Supabase) para persistência ubiqua e inteligência compartilhada.
+- **Processamento Local:** Backend local assume papéis de otimização (WebP), anonimização e scraping distribuído.
+- **Componentização:** Refatoração do frontend em domínios específicos para evitar o "Fat App.tsx".
