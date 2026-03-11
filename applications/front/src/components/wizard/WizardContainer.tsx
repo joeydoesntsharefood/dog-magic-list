@@ -55,22 +55,31 @@ const WizardContainer: React.FC<WizardContainerProps> = (props) => {
   } = props;
 
   return (
-    <section className="max-w-5xl mx-auto pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="mb-12 flex justify-between items-center border-b border-zinc-800 pb-6">
+    <section className="max-w-6xl mx-auto pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="mb-12 flex justify-between items-center bg-surface/40 p-8 rounded-3xl border border-white/5 backdrop-blur-sm">
         <div>
-          <h2 className="text-xl font-black uppercase tracking-tighter">DECK_WIZARD_PROMPT</h2>
-          <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mt-1">
-            Status: Step_0{wizardStep + 1} / {deckProfile.format || 'INITIALIZING'}
-          </p>
+          <h2 className="text-3xl font-black text-white tracking-tight">Deck Builder</h2>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] bg-primary/10 px-2 py-0.5 rounded">
+              Step {wizardStep + 1} of 8
+            </span>
+            <span className="text-slate-600">/</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              {deckProfile.format || 'Initializing'}
+            </span>
+          </div>
         </div>
-        <div className="text-right flex flex-col items-end gap-2">
-          <p className={`text-[10px] font-black ${budgetStatus.exceeded ? 'text-[#8A3A34] animate-pulse' : 'text-green-600'}`}>
-            BUDGET_REMAINING: R$ {(deckProfile.targetBudget - currentTotalCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </p>
+        <div className="text-right flex flex-col items-end gap-3">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Budget Status</span>
+            <p className={`text-xl font-black ${budgetStatus.exceeded ? 'text-error animate-pulse' : 'text-success'}`}>
+              R$ {(deckProfile.targetBudget - currentTotalCost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} remaining
+            </p>
+          </div>
           {wizardStep >= 4 && (
             <div className="flex gap-2">
-              <button onClick={() => onOptimizeBudget('LOW')} className="bg-zinc-900 text-[8px] font-bold px-2 py-1 hover:bg-white hover:text-black transition-all">[LOW_COST_TUNING]</button>
-              <button onClick={() => onOptimizeBudget('HIGH')} className="bg-zinc-900 text-[8px] font-bold px-2 py-1 hover:bg-white hover:text-black transition-all">[PREMIUM_TUNING]</button>
+              <button onClick={() => onOptimizeBudget('LOW')} className="bg-slate-900 text-[10px] font-bold px-4 py-2 rounded-lg hover:bg-primary hover:text-white transition-all text-slate-400 border border-white/5 shadow-lg">Low Cost Tune</button>
+              <button onClick={() => onOptimizeBudget('HIGH')} className="bg-slate-900 text-[10px] font-bold px-4 py-2 rounded-lg hover:bg-primary hover:text-white transition-all text-slate-400 border border-white/5 shadow-lg">Premium Tune</button>
             </div>
           )}
         </div>

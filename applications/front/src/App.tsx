@@ -8,12 +8,18 @@ import DeckDetail from './components/inventory/DeckDetail';
 import SearchBar from './components/market/SearchBar';
 import MarketResult from './components/market/MarketResult';
 import WizardContainer from './components/wizard/WizardContainer';
+import LoginScreen from './components/layout/LoginScreen';
+import { useAuth } from './context/AuthContext';
+import { useTheme } from './context/ThemeContext';
 import { 
   List, CardSuggestion, CardVersion, CardPriceResult, 
   OffersResult, WizardDeckItem, DeckProfile, API_BASE_URL 
 } from './types';
 
 function App() {
+  const { user, isLoading: authLoading } = useAuth();
+  const { theme, setTheme } = useTheme();
+  
   const [loading, setLoading] = useState(!((import.meta as any).env?.MODE === 'test'));
   const [activeTab, setActiveTab] = useState<'lists' | 'search' | 'wizard'>('lists');
   const [bootSequence, setBootSequence] = useState<string[]>([]);
@@ -54,10 +60,17 @@ function App() {
     const intervalTime = isTest ? 0 : 200;
     const interval = setInterval(() => {
       if (i < logs.length) { setBootSequence(prev => [...prev, logs[i]]); i++; } 
-      else { clearInterval(interval); setTimeout(() => { loadLists().finally(() => setLoading(false)); }, isTest ? 0 : 500); }
+      else { 
+        clearInterval(interval); 
+        if (user) {
+          loadLists().finally(() => setLoading(false)); 
+        } else {
+          setLoading(false);
+        }
+      }
     }, intervalTime);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const loadLists = async () => {
     try {
@@ -354,29 +367,29 @@ function App() {
     return { percent: (currentTotalCost / deckProfile.targetBudget) * 100, exceeded: currentTotalCost > deckProfile.targetBudget };
   }, [currentTotalCost, deckProfile.targetBudget]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] p-12 font-mono flex items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-background p-12 font-mono flex items-center justify-center relative overflow-hidden">
         <MatrixRain />
         <div className="z-10 flex flex-col items-center gap-12 max-w-2xl w-full">
           <div className="relative group">
-            <div className="w-48 h-48 rounded-full overflow-hidden pixel-border border-4 border-zinc-800 bg-black flex items-center justify-center animate-glitch">
+            <div className="w-48 h-48 rounded-full overflow-hidden pixel-border border-4 border-border bg-surface flex items-center justify-center animate-glitch">
               <img src="/logo.png" alt="Logo" className="w-40 h-40 object-contain brightness-75 group-hover:brightness-100 transition-all duration-75" />
             </div>
             <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-white/5 to-transparent h-2 animate-scanline"></div>
           </div>
-          <div className="w-full bg-black/80 p-6 border border-zinc-800">
+          <div className="w-full bg-surface/80 p-6 border border-border">
             <div className="space-y-2">
               {bootSequence.map((log, idx) => (
-                <p key={idx} className="text-[#E8DCCA] text-[10px] leading-tight flex gap-2">
-                  <span className="text-[#9E8C6A]">[{new Date().toLocaleTimeString()}]</span>
+                <p key={idx} className="text-secondary text-[10px] leading-tight flex gap-2">
+                  <span className="text-accent">[{new Date().toLocaleTimeString()}]</span>
                   <span className="text-zinc-500">{">>>"}</span> {log}
                 </p>
               ))}
               <div className="flex items-center gap-2 text-[10px]">
-                <span className="text-[#9E8C6A]">[{new Date().toLocaleTimeString()}]</span>
+                <span className="text-accent">[{new Date().toLocaleTimeString()}]</span>
                 <span className="text-zinc-500">{">>>"}</span> 
-                <span className="w-2 h-3 bg-[#8A3A34] animate-pulse"></span>
+                <span className="w-2 h-3 bg-primary animate-pulse"></span>
               </div>
             </div>
           </div>
@@ -385,14 +398,18 @@ function App() {
     );
   }
 
+  if (!user) {
+    return <LoginScreen />;
+  }
+
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#E8DCCA] font-mono selection:bg-[#8A3A34] selection:text-white" onClick={() => setActiveEditionSelector(null)}>
+    <div className="min-h-screen bg-background text-secondary font-mono selection:bg-primary selection:text-white" onClick={() => setActiveEditionSelector(null)}>
       
       {expandedCard && (
         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-10 backdrop-blur-sm" onClick={() => setExpandedCard(null)}>
           <div className="relative animate-in zoom-in-95 duration-200">
-            <img src={expandedCard} alt="Expanded" className="max-h-[85vh] rounded-xl shadow-[0_0_50px_rgba(158,140,106,0.3)] border-4 border-zinc-800" />
-            <p className="text-center mt-4 text-[10px] font-black text-[#9E8C6A] tracking-[0.5em] uppercase">CLICK_TO_CLOSE</p>
+            <img src={expandedCard} alt="Expanded" className="max-h-[85vh] rounded-xl shadow-[0_0_50px_rgba(158,140,106,0.3)] border-4 border-border" />
+            <p className="text-center mt-4 text-[10px] font-black text-accent tracking-[0.5em] uppercase">CLICK_TO_CLOSE</p>
           </div>
         </div>
       )}
@@ -400,7 +417,7 @@ function App() {
       {errorMessage && (
         <div 
           onClick={() => setErrorMessage(null)}
-          className="fixed top-0 left-0 right-0 z-[110] p-4 bg-[#8A3A34] text-white text-center text-xs font-black border-b-2 border-black cursor-pointer animate-in slide-in-from-top duration-300 hover:bg-[#A54A42] shadow-2xl group"
+          className="fixed top-0 left-0 right-0 z-[110] p-4 bg-primary text-white text-center text-xs font-black border-b-2 border-black cursor-pointer animate-in slide-in-from-top duration-300 hover:bg-red-700 shadow-2xl group"
         >
           <div className="flex items-center justify-center gap-4">
             <span className="animate-pulse text-white/50">!!</span>
@@ -419,6 +436,15 @@ function App() {
 
         <main className="flex-1 overflow-y-auto p-10 custom-scrollbar">
           
+          <div className="flex justify-end gap-4 mb-4">
+            <button 
+              onClick={() => setTheme(theme === 'midnight' ? 'planeswalker' : 'midnight')}
+              className="text-[8px] font-black text-accent uppercase tracking-widest border border-border px-2 py-1 hover:bg-surface transition-all"
+            >
+              [THEME: {theme.toUpperCase()}]
+            </button>
+          </div>
+
           {activeTab === 'lists' && !viewingDeck && (
             <InventoryGrid 
               lists={lists}

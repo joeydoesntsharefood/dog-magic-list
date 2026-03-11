@@ -21,42 +21,54 @@ const InventoryGrid: React.FC<InventoryGridProps> = ({
   const isTest = (import.meta as any).env?.MODE === 'test';
 
   return (
-    <section className={`max-w-5xl mx-auto ${!isTest ? 'animate-in fade-in' : ''}`} data-testid="inventory-grid">
-      <div className="flex justify-between items-end mb-10 border-b border-zinc-900 pb-6">
-        <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">// INVENTORY_REGISTRY</h2>
+    <section className={`max-w-6xl mx-auto ${!isTest ? 'animate-in fade-in' : ''}`} data-testid="inventory-grid">
+      <div className="flex justify-between items-center mb-16 border-b border-border pb-8">
+        <div>
+          <h2 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Master Registry</h2>
+          <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.4em] mt-2 italic">Verified Assets Distribution</p>
+        </div>
         <button 
           onClick={onInitiateNewBuild} 
-          className="bg-[#8A3A34] text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all"
+          className="bg-primary text-white px-8 py-4 rounded-sm font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-900 transition-all shadow-md hover:shadow-xl"
         >
-          [+ INITIATE_NEW_BUILD]
+          + Initiate New Build
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-900 border border-zinc-900">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {Array.isArray(lists) && lists.map(list => (
           <div 
             key={list.id} 
             onClick={() => onViewDeck(list.id)} 
-            className="group p-8 bg-black hover:bg-zinc-950 transition-all cursor-pointer border-b md:border-b-0 border-zinc-900 border-l-2 border-l-transparent hover:border-l-[#8A3A34] relative"
+            className="group p-8 bg-surface border border-border rounded-sm transition-all cursor-pointer relative overflow-hidden document-shadow hover:shadow-2xl hover:-translate-y-1"
             data-testid={`deck-card-${list.id}`}
           >
+            <div className="absolute top-0 left-0 w-[3px] h-full bg-primary/20 group-hover:bg-primary transition-colors"></div>
+            
             <button 
               onClick={(e) => onDeleteDeck(e, list.id)} 
               onMouseLeave={() => setConfirmingDeleteDeckId(null)}
-              className={`absolute top-4 right-4 text-[8px] font-black transition-all uppercase tracking-widest ${confirmingDeleteDeckId === list.id ? 'opacity-100 text-white bg-[#8A3A34] px-2 py-1' : 'opacity-0 group-hover:opacity-100 text-zinc-700 hover:text-[#8A3A34]'}`}
+              className={`absolute top-4 right-4 text-[8px] font-black transition-all px-2 py-1 uppercase tracking-widest ${confirmingDeleteDeckId === list.id ? 'bg-accent text-white opacity-100' : 'text-slate-300 opacity-0 group-hover:opacity-100 hover:text-accent'}`}
             >
-              {confirmingDeleteDeckId === list.id ? '[CONFIRM_ERASE?]' : '[ERASE_RECORD]'}
+              {confirmingDeleteDeckId === list.id ? 'Confirm Erase?' : 'Delete'}
             </button>
-            <h3 className="font-black text-sm group-hover:text-[#8A3A34] tracking-widest uppercase mb-2">{list.name}</h3>
-            <div className="flex justify-between items-center text-[8px] font-bold text-zinc-700">
-              <span>REC_ID: {list.id.slice(0, 8)}</span>
-              <span className="uppercase text-[#9E8C6A]">{list.format}</span>
+
+            <h3 className="font-bold text-xl text-slate-800 mb-6 group-hover:text-primary transition-colors leading-tight uppercase tracking-tight pr-8">{list.name}</h3>
+            
+            <div className="flex justify-between items-end border-t border-slate-50 pt-6">
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Index Code</span>
+                <span className="text-[10px] font-mono text-slate-500">{list.id.slice(0, 12)}</span>
+              </div>
+              <div className="px-2 py-1 bg-slate-50 border border-border rounded-sm">
+                <span className="text-[9px] font-black text-primary uppercase tracking-tighter">{list.format}</span>
+              </div>
             </div>
           </div>
         ))}
         {(!lists || lists.length === 0) && (
-          <div className="col-span-3 p-20 text-center bg-black">
-            <p className="text-[10px] font-black text-zinc-800 uppercase tracking-[0.5em]">No_Records_Found_In_Master_Grimoire</p>
+          <div className="col-span-full py-32 text-center bg-surface/50 rounded-sm border border-dashed border-border">
+            <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-xs italic">The archive vault is currently empty.</p>
           </div>
         )}
       </div>
